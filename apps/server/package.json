@@ -1,0 +1,20 @@
+{
+  "name": "@draftroom/server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev":"tsx watch src/index.ts",
+    "build":"tsc",
+    "start":"node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/express": "^5.0.6",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "@repo/typescript-config":"workspace:*"
+  }
+}

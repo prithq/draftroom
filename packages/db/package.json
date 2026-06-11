@@ -1,0 +1,20 @@
+{
+  "name": "@draftroom/db",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "db:migrate": "prisma migrate",
+    "db:generate": "prisma generate",
+    "db:seed": "prisma seed"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "6.5",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "prisma": "6.5"
+  }
+}
