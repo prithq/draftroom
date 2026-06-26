@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "db:migrate": "prisma migrate",
+    "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:seed": "prisma seed"
+    "db:seed": "tsx prisma/seed.ts"
+    
   },
   "keywords": [],
   "author": "",
@@ -15,9 +16,10 @@
     "@prisma/client": "6.5",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",
-    "prisma": "6.5"
+    "prisma": "6.5",
+    "tsx": "^4.22.4"
   },
-  "exports":{
-    ".":"./src/index.ts"
+  "exports": {
+    ".": "./src/index.ts"
   }
 }

@@ -13,7 +13,7 @@ const io=new Server(server,{
     }
 })
 
-io.on("conncection",(socket)=>{
+io.on("connection",(socket)=>{
 
     socket.on("message",(data: any)=>{
         io.emit("message",data)

@@ -9,8 +9,169 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User{
-  id String @id default(cuid())
-  name String
-  email String @unique
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  ownedRooms Room[]  @relation("OwnedRooms")
+  participant Participant[]
+
+ 
+
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Question {
+  id          String     @id @default(cuid())
+  title       String
+  slug        String     @unique
+  description String     // markdown — problem statement, examples, constraints
+  difficulty  Difficulty
+  pattern     String     // e.g. "two-pointers", "sliding-window", "dp"
+  tags        String[]   // e.g. ["array", "hash-map"]
+  starterCode Json       // { javascript: "...", python: "...", go: "..." }
+  isPublished Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  testCases TestCase[]
+  rooms     Room[]
+
+  @@index([difficulty])
+  @@index([pattern])
+  @@map("question")
+}
+
+
+model TestCase {
+  id         String   @id @default(cuid())
+  questionId String
+  input      Json     // e.g. { nums: [2,7,11,15], target: 9 }
+  expected   Json     // e.g. [0,1]
+  isHidden   Boolean  @default(true)  // hidden from candidate, shown to interviewer
+  weight     Int      @default(1)     // for partial-credit scoring later
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("test_case")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Room {
+
+  
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  ownerId   String
+  language  String    @default("javascript")
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  owner        User          @relation("OwnedRooms", fields: [ownerId], references: [id], onDelete: Cascade)
+  participant  Participant[]
+  snapshots    Snapshot[]
+  questionId String?
+  question   Question? @relation(fields: [questionId], references: [id])
+
+  @@map("room")
+}
+
+
+model Participant{
+
+  id String @id @default(cuid())
+  roomId String
+  role Role @default(CANDIDATE)
+  joinedAt DateTime @default(now())
+  userId String
+
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@map("participant")
+}
+
+
+model Snapshot {
+  id          String   @id @default(cuid())
+  roomId      String
+  canvasJson  Json
+  codeContent String
+  takenAt     DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("snapshot")
+}
+
+
+enum Role{
+  INTERVIEWER
+  CANDIDATE
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
 }
