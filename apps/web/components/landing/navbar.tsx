@@ -1,9 +1,13 @@
-export default function Naavbar(){
+export default function Navbar(){
+
+return(
+
+<div>
 
 
-<div></div>
 
 
-
+</div>
+)
 
 }
