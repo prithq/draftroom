@@ -109,6 +109,29 @@ io.on("connection",(socket) => {
     })
   })
 
+
+  socket.on("webrtc-offer",({roomId,offer,targetSocketId})=>{
+
+    io.to(targetSocketId).emit("webrtc-offer",{offer,fromSocketId:socket.id})
+  })
+
+   socket.on("webrtc-answer",({roomId,answer,targetSocketId})=>{
+
+    io.to(targetSocketId).emit("webrtc-answer",{answer,fromSocketId:socket.id})
+  })
+
+  socket.on("webrtc-ice", ({ roomId, candidate, targetSocketId }) => {
+  io.to(targetSocketId).emit("webrtc-ice", {
+    candidate,
+    fromSocketId: socket.id
+  })
+})
+
+
+
+
+
+
   socket.on("code-change",({roomId,code})=>{
 
     roomCode.set(roomId,code)
@@ -145,7 +168,10 @@ function handleLeave(socket: any, roomId: string) {
     console.log(`room ${roomId} is empty, cleaned up`)
   } else {
     
-    io.to(roomId).emit("room-users", Array.from(roomUsers.values()))
+    io.to(roomId).emit("room-users", Array.from(roomUsers.entries()).map(([socketId,user])=>({
+      ...user,
+      socketId
+    })))
     console.log(`${user?.name} left room ${roomId}`)
   }
 }
