@@ -1,15 +1,22 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
-import { cn } from "@/lib/utils";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-bricolage",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "Draftroom — Code interviews, done right.",
-  description:
-    "A shared whiteboard and code editor in one room. Draw diagrams, write code, run it live, and talk through your thinking together.",
+  title: "DraftRoom - Coding Interviews That Feel Real",
+  description: "DraftRoom is a realtime interview platform built to explore multiplayer editing, WebRTC and collaborative canvases.",
 };
 
 export default function RootLayout({
@@ -18,8 +25,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn(geist.variable, geistMono.variable)}>
-      <body className="font-sans antialiased">{children}</body>
+    <html lang="en" className={`${inter.variable} ${bricolage.variable}`}>
+      <body className="font-sans antialiased min-h-screen">
+        {children}
+      </body>
     </html>
   );
 }
