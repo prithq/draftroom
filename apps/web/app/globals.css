@@ -1,16 +1,32 @@
-@import "tailwindcss";
+@import "tailwindcss" layer(base);
+@import "tailwindcss/utilities" layer(utilities);
 
 @theme {
-  /* Your exact colors */
-  --color-background: hsl(196 100% 92%);
+  /* Base Colors for the new minimalist look */
+  --color-background: hsl(0 0% 100%);
   --color-foreground: hsl(0 0% 0%);
-  --color-primary: hsl(205 98% 56%);
-  --color-primary-foreground: hsl(0 0% 100%);
-  --color-muted: hsl(210 40% 96.1%);
+  
+  /* Light grays for borders and cards */
+  --color-border: hsl(0 0% 90%);
+  --color-muted: hsl(0 0% 96%);
+  --color-muted-foreground: hsl(0 0% 45%);
 
-  /* Font family variables */
+  /* Primary is now black */
+  --color-primary: hsl(0 0% 0%); 
+  --color-primary-foreground: hsl(0 0% 100%);
+  
+  /* The 'card' background */
+  --color-card: hsl(0 0% 98%);
+
+  /* Fonts */
   --font-sans: var(--font-inter);
-  --font-bricolage: var(--font-bricolage);
+}
+
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
 body {
