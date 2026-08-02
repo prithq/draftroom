@@ -1,35 +1,36 @@
-@import "tailwindcss" layer(base);
-@import "tailwindcss/utilities" layer(utilities);
+@import "tailwindcss";
 
 @theme {
-  /* Base Colors for the new minimalist look */
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(0 0% 0%);
-  
-  /* Light grays for borders and cards */
-  --color-border: hsl(0 0% 90%);
-  --color-muted: hsl(0 0% 96%);
-  --color-muted-foreground: hsl(0 0% 45%);
+  /* Color palette hardcoded to match the screenshot exactly */
+  --color-background: #f7f6f4;      
+  --color-foreground: #131313;      
+  --color-primary: #2b6eaf;         
+  --color-primary-foreground: #ffffff;
+  --color-muted: #f0efec;           
+  --color-muted-foreground: #6b6a67;
+  --color-border: #d8d7d4;          
+  --color-card: #ffffff;
+  --color-card-foreground: #131313;
+  --color-ring: #2b6eaf;
 
-  /* Primary is now black */
-  --color-primary: hsl(0 0% 0%); 
-  --color-primary-foreground: hsl(0 0% 100%);
-  
-  /* The 'card' background */
-  --color-card: hsl(0 0% 98%);
+  --radius: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
 
   /* Fonts */
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
-@utility label-mono {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-
-body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
 }
