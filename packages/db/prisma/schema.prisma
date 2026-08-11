@@ -23,9 +23,6 @@ model User {
   ownedRooms Room[]  @relation("OwnedRooms")
   participant Participant[]
 
- 
-
-
   @@unique([email])
   @@map("user")
 }

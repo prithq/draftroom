@@ -1,5 +1,11 @@
+"use client"
+
 import { Mail, Lock, Zap, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { authClient } from "@/lib/auth-client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { resume } from "react-dom/server";
 
 // --- Tiny SVG Icons for the buttons ---
 const GoogleIcon = () => (
@@ -19,6 +25,50 @@ const GitHubIcon = () => (
 // --- End SVGs ---
 
 export default function SignInPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const res=await authClient.signIn.email({ 
+        email, 
+        password 
+      });
+
+      console.log("signin result",res)
+      // Redirect to dashboard or home page after successful sign in
+      router.push("/dashboard");
+    } catch (err: any) {
+      console.error("Sign in error:", err);
+      setError(err?.message || "Invalid email or password. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleSocialSignIn(provider: "google" | "github") {
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      await authClient.signIn.social({ 
+        provider 
+      });
+      // The social provider will handle the redirect
+    } catch (err: any) {
+      console.error(`${provider} sign in error:`, err);
+      setError(err?.message || `Failed to sign in with ${provider}. Please try again.`);
+      setIsLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-4">
       {/* Back Button */}
@@ -47,13 +97,28 @@ export default function SignInPage() {
           </p>
         </div>
 
-        {/* Social Buttons - With Icons */}
+        {/* Error Display */}
+        {error && (
+          <div className="mt-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Social Buttons */}
         <div className="mt-8 flex flex-col gap-3">
-          <button className="flex items-center justify-center gap-2.5 w-full rounded-md border border-border bg-background py-2.5 text-[13px] font-medium text-foreground transition-colors hover:border-foreground">
+          <button 
+            onClick={() => handleSocialSignIn("google")}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2.5 w-full rounded-md border border-border bg-background py-2.5 text-[13px] font-medium text-foreground transition-colors hover:border-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <GoogleIcon />
             Continue with Google
           </button>
-          <button className="flex items-center justify-center gap-2.5 w-full rounded-md border border-border bg-background py-2.5 text-[13px] font-medium text-foreground transition-colors hover:border-foreground">
+          <button 
+            onClick={() => handleSocialSignIn("github")}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2.5 w-full rounded-md border border-border bg-background py-2.5 text-[13px] font-medium text-foreground transition-colors hover:border-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <GitHubIcon />
             Continue with GitHub
           </button>
@@ -68,7 +133,7 @@ export default function SignInPage() {
           </div>
         </div>
 
-        <form className="space-y-4">
+        <form onSubmit={handleSignIn} className="space-y-4">
           <div>
             <label className="block text-[13px] font-medium text-foreground mb-1.5">Email</label>
             <div className="relative">
@@ -76,30 +141,44 @@ export default function SignInPage() {
               <input
                 type="email"
                 placeholder="sarah@example.com"
-                className="w-full rounded-md border border-border bg-background px-9 py-2.5 text-[13px] font-medium placeholder:text-muted-foreground focus:border-foreground focus:outline-none"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                required
+                className="w-full rounded-md border border-border bg-background px-9 py-2.5 text-[13px] font-medium placeholder:text-muted-foreground focus:border-foreground focus:outline-none disabled:opacity-50"
               />
             </div>
           </div>
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-[13px] font-medium text-foreground">Password</label>
-             
-            </div>
+            <label className="block text-[13px] font-medium text-foreground mb-1.5">Password</label>
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="password"
                 placeholder="••••••••"
-                className="w-full rounded-md border border-border bg-background px-9 py-2.5 text-[13px] font-medium placeholder:text-muted-foreground focus:border-foreground focus:outline-none"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                required
+                minLength={8}
+                className="w-full rounded-md border border-border bg-background px-9 py-2.5 text-[13px] font-medium placeholder:text-muted-foreground focus:border-foreground focus:outline-none disabled:opacity-50"
               />
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full rounded-md bg-foreground py-2.5 text-[13px] font-medium tracking-tight text-background transition-colors hover:bg-primary"
+            disabled={isLoading}
+            className="w-full rounded-md bg-foreground py-2.5 text-[13px] font-medium tracking-tight text-background transition-colors hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Sign In
+            {isLoading ? (
+              <>
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                Signing in...
+              </>
+            ) : (
+              "Sign In"
+            )}
           </button>
         </form>
 

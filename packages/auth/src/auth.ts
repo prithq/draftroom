@@ -8,7 +8,9 @@ export const auth = betterAuth({
   }),
 
   emailAndPassword: {
-    enabled: true
+    enabled: true,
+    requireEmailVerification:false,
+    autoSignIn:true
   },
 
   secret: process.env.BETTER_AUTH_SECRET as string,
