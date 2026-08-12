@@ -86,7 +86,7 @@ export default function SignInPage() {
       <div className="w-full max-w-md rounded-md border border-border bg-card p-8">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-primary" />
+          <span className="inline-block h-2.5 w-2.5 rounded-xs bg-primary" />
           <span className="text-[18px] font-bold tracking-tight text-foreground">draftroom</span>
         </div>
 

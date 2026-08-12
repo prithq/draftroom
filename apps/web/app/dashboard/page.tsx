@@ -72,7 +72,7 @@ export default function DashboardPage() {
       <nav className="border-b border-border bg-card px-6 py-4">
         <div className="mx-auto max-w-6xl flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-primary" />
+            <span className="inline-block h-2.5 w-2.5 rounded-xs bg-primary" />
             <span className="text-[18px] font-bold tracking-tight text-foreground">
               draftroom
             </span>

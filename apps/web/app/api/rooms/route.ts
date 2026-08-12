@@ -41,8 +41,8 @@ export async function POST(request:NextRequest){
         return NextResponse.json({
     error:"Unauthorized"},{status:401})
 
-    const {name,language}=await request.json()
-    if(!name|| language){
+    const {name,language,roomType}=await request.json()
+    if(!name|| !language || !roomType){
         return NextResponse.json({
             error:"name or language is not provided"
         },{status:400})
@@ -52,9 +52,19 @@ export async function POST(request:NextRequest){
     const suffix=Math.random().toString(36).slice(2,6)
     const slug=`${baseSlug}-${suffix}`
 
+    if(roomType!=="INTERVIEW"&& roomType!=="SOLO" )
+        return NextResponse.json(
+            {
+                error:"roomType must be interview or solo"
+            },
+            {
+                status:400
+            }
+        )
+
     const room=await prisma.room.create({
         data:{
-            name,language,slug,ownerId:session.user.id
+            name,language,slug,ownerId:session.user.id,roomType
         }
     })
 

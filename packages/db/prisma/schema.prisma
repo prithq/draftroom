@@ -121,6 +121,7 @@ model Room {
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   expiresAt DateTime?
+  roomType RoomType   @default(INTERVIEW)
 
   owner        User          @relation("OwnedRooms", fields: [ownerId], references: [id], onDelete: Cascade)
   participant  Participant[]
@@ -171,4 +172,9 @@ enum Difficulty {
   EASY
   MEDIUM
   HARD
+}
+
+enum RoomType{
+  INTERVIEW
+  SOLO
 }

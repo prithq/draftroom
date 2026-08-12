@@ -15,10 +15,13 @@ import {
   Check,
   X,
   MessageSquare,
+  User,
+  Target,
+  Zap,
 } from "lucide-react";
 
 const GITHUB_URL = "https://github.com/prithq/draftroom";
-const DEMO_URL = "#hero";
+const DEMO_URL = "/signup";
 
 export default function Landing() {
   return (
@@ -27,6 +30,7 @@ export default function Landing() {
       <main className="pt-24">
         <Hero />
         <Integrations />
+        <Modes /> {/* New section for Solo + Interview */}
         <HowItWorks />
         <Benefits />
         <Comparison />
@@ -119,7 +123,7 @@ function Logo({ dark = false }: { dark?: boolean }) {
 
 function Navbar() {
   const links = [
-    { label: "Process", href: "#process" },
+    { label: "Modes", href: "#modes" },
     { label: "Features", href: "#benefits" },
     { label: "Why It's Different", href: "#compare" },
     { label: "Preview", href: "#preview" },
@@ -140,67 +144,85 @@ function Navbar() {
             </li>
           ))}
         </ul>
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 text-[14px] font-medium text-foreground hover:text-primary"
-        >
-          <Github className="h-4 w-4" />
-          Source
-        </a>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/signin"
+            className="text-[14px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Sign In
+          </Link>
+          <Link
+            href="/signup"
+            className="rounded-md bg-foreground px-4 py-2 text-[14px] font-medium text-background transition-colors hover:bg-primary"
+          >
+            Get Started
+          </Link>
+        </div>
       </nav>
     </header>
   );
 }
 
 /* ---------- HERO ---------- */
+/* ---------- HERO ---------- */
 function Hero() {
   return (
     <section id="hero" className="border-b border-border px-6 py-28">
       <div className="mx-auto max-w-6xl">
-        <Link
-          href="#preview"
-          className="inline-flex items-center gap-3 text-[12px] font-medium tracking-[0.08em] text-muted-foreground hover:text-foreground"
-        >
-          <span className="text-primary">Easy,Modern and Natural.</span>
-         
-          <ArrowRight className="h-4 w-4" />
-        </Link>
+        {/* Centered content */}
+        <div className="flex flex-col items-center text-center">
+          <Link
+            href="#modes"
+            className="inline-flex items-center gap-3 text-[12px] font-medium tracking-[0.08em] text-muted-foreground hover:text-foreground"
+          >
+            <span className="text-primary">Practice solo or collaborate live</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
 
-        <h1 className="mt-8 max-w-4xl text-[72px] leading-[1.02] tracking-tight md:text-[88px] font-black">
-          Coding interviews
-          <br />
-          <span className="text-primary">that feel real.</span>
-        </h1>
+          <h1 className="mt-8 max-w-4xl text-[72px] leading-[1.02] tracking-tight md:text-[88px] font-black">
+            Code, practice, and
+            <br />
+            <span className="text-primary">collaborate freely.</span>
+          </h1>
 
-        <p className="mt-6 max-w-2xl text-[20px] leading-relaxed text-muted-foreground">
-          DraftRoom is a realtime interview platform I built to explore
-          multiplayer editing, WebRTC and collaborative canvases — code editor,
-          Excalidraw whiteboard, LeetCode problems and HD video in one room.
-        </p>
+          <p className="mt-6 max-w-2xl text-[20px] leading-relaxed text-muted-foreground">
+            DraftRoom is a realtime coding workspace where you can practice solo 
+            with LeetCode-style problems, or collaborate with others using multiplayer 
+            editing, Excalidraw whiteboard, and HD video — all in one room.
+          </p>
 
-        <div className="mt-8 flex flex-wrap gap-4">
-          <PrimaryLink href="signup">Get Started</PrimaryLink>
-          <GhostLink href={GITHUB_URL} external>
-            <Github className="h-4 w-4" />
-            View Source
-          </GhostLink>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <PrimaryLink href="/signup">Start Practicing Free</PrimaryLink>
+            <GhostLink href={GITHUB_URL} external>
+              <Github className="h-4 w-4" />
+              View Source
+            </GhostLink>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+              Free forever for solo practice
+            </span>
+            <span className="hidden sm:inline">•</span>
+            <span>No credit card required</span>
+          </div>
         </div>
 
-        <div className="mt-16 grid border-t border-border sm:grid-cols-2 lg:grid-cols-4">
+        {/* Feature grid - centered and max-width constrained */}
+        <div className="mt-16 grid border-t border-border sm:grid-cols-2 lg:grid-cols-4 max-w-5xl mx-auto">
           {[
-            "Realtime multiplayer code editor with syntax highlighting",
-            "Excalidraw whiteboard for system design rounds",
-            "Curated LeetCode-style problem library",
-            "Built-in HD video calling — no Zoom link needed",
+            "Practice solo with curated LeetCode-style problems",
+            "Multiplayer code editor for pair programming",
+            "Excalidraw whiteboard for system design",
+            "Built-in HD video calling for collaboration",
           ].map((t, i) => (
             <div
               key={t}
-              className="border-b border-border py-6 pr-8 lg:border-b-0 lg:border-r lg:pl-6 lg:first:pl-0 lg:last:border-r-0"
+              className="border-b border-border py-6 px-4 lg:border-b-0 lg:border-r lg:first:pl-0 lg:last:border-r-0 lg:last:pr-0 text-center"
             >
               <Label>{String(i + 1).padStart(2, "0")}</Label>
-              <p className="mt-3 text-[16px] leading-snug text-foreground/80 font-medium">
+              <p className="mt-3 text-[15px] leading-snug text-foreground/80 font-medium">
                 {t}
               </p>
             </div>
@@ -210,6 +232,7 @@ function Hero() {
     </section>
   );
 }
+
 
 /* ---------- INTEGRATIONS ---------- */
 function Integrations() {
@@ -223,7 +246,7 @@ function Integrations() {
     <section className="border-b border-border px-6 py-14">
       <div className="mx-auto flex max-w-6xl flex-col items-start gap-8 md:flex-row md:items-center md:justify-between">
         <p className="max-w-xs font-mono text-[11px] uppercase leading-relaxed tracking-[0.14em] text-muted-foreground">
-          Built on open-source tools I love working with
+          Powered by open-source tools you love
         </p>
         <div className="flex flex-wrap items-center gap-x-12 gap-y-6">
           {tools.map((t) => (
@@ -263,15 +286,122 @@ function SectionHeader({
   );
 }
 
+/* ---------- MODES (NEW) ---------- */
+function Modes() {
+  return (
+    <section id="modes" className="border-b border-border px-6 py-24">
+      <div className="mx-auto max-w-6xl">
+        <SectionHeader
+          index="01 / Modes"
+          title={
+            <>
+              Two ways to
+              <br />
+              use DraftRoom
+            </>
+          }
+          body="Whether you're practicing solo to sharpen your skills or collaborating with others in real-time, DraftRoom adapts to your workflow."
+        />
+
+        <div className="mt-16 grid gap-6 md:grid-cols-2">
+          {/* Solo Mode */}
+          <div className="rounded-md border border-border bg-card p-8 hover:shadow-lg transition-shadow">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <User className="h-6 w-6" />
+            </div>
+            <h3 className="mt-4 text-2xl font-bold tracking-tight">Solo Practice</h3>
+            <p className="mt-2 text-muted-foreground">
+              Practice coding problems on your own. Use Excalidraw to visualize 
+              solutions and test cases to validate your code.
+            </p>
+            <ul className="mt-6 space-y-3 text-sm">
+              <li className="flex items-start gap-3">
+                <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                <span>Solve curated problems with test cases</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                <span>Whiteboard for algorithm visualization</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                <span>Self-paced learning with immediate feedback</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                <span>Multiple programming languages supported</span>
+              </li>
+            </ul>
+            <div className="mt-6">
+              <span className="inline-flex items-center rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-500">
+                ✨ Free forever
+              </span>
+            </div>
+            <Link
+              href="/signup"
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md bg-foreground px-6 py-3 text-sm font-medium text-background transition-colors hover:bg-primary"
+            >
+              Start Solo Practice
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {/* Interview/Collab Mode */}
+          <div className="rounded-md border-2 border-primary/20 bg-card p-8 hover:shadow-lg transition-shadow">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Users className="h-6 w-6" />
+            </div>
+            <h3 className="mt-4 text-2xl font-bold tracking-tight">Live Collaboration</h3>
+            <p className="mt-2 text-muted-foreground">
+              Create a room and invite others for live coding interviews, pair 
+              programming, or collaborative problem-solving.
+            </p>
+            <ul className="mt-6 space-y-3 text-sm">
+              <li className="flex items-start gap-3">
+                <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                <span>Real-time multiplayer code editing</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                <span>Shared Excalidraw whiteboard</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                <span>HD video calling built-in</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                <span>Session replay with code diffs + canvas</span>
+              </li>
+            </ul>
+            <div className="mt-6">
+              <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                🚀 Perfect for interviews
+              </span>
+            </div>
+            <Link
+              href="/signup"
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-md border-2 border-primary bg-transparent px-6 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary hover:text-background"
+            >
+              Start Collaborating
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ---------- HOW IT WORKS ---------- */
 function HowItWorks() {
   return (
     <section id="process" className="border-b border-border px-6 py-24">
       <div className="mx-auto max-w-6xl">
         <SectionHeader
-          index="01 / Process"
+          index="02 / Process"
           title="How DraftRoom works"
-          body="Run a real technical interview in three simple steps."
+          body="Get started in seconds — whether you're practicing alone or collaborating with others."
         />
 
         <div className="mt-16 grid border-t border-border md:grid-cols-3">
@@ -279,21 +409,21 @@ function HowItWorks() {
             icon={Calendar}
             step="01"
             title="Create a Room"
-            body="Spin up an interview link in one click. Invite your candidate — no downloads, no installs."
+            body="Spin up a workspace in one click. Choose solo practice or invite others to collaborate."
             mock={<RoomMock />}
           />
           <StepCard
             icon={Users}
             step="02"
-            title="Collaborate Live"
-            body="Code together in the multiplayer editor, sketch systems on the Excalidraw whiteboard, all in realtime."
+            title="Code & Visualize"
+            body="Write code in the multiplayer editor, sketch solutions on the whiteboard, and run test cases."
             mock={<CollabMock />}
           />
           <StepCard
             icon={FileText}
             step="03"
-            title="Review & Decide"
-            body="Get a session replay with code diffs, whiteboard snapshots and video — share it with your hiring team."
+            title="Review & Improve"
+            body="Get session replays with code diffs, whiteboard snapshots, and insights to track progress."
             mock={<ReviewMock />}
           />
         </div>
@@ -342,25 +472,26 @@ function RoomMock() {
   return (
     <Panel>
       <div className="border-b border-border px-3 py-2">
-        <Label>New Interview Room</Label>
+        <Label>New Workspace</Label>
       </div>
       <div className="p-3">
-        <div className="rounded border border-border px-3 py-2 text-[14px]">
-          Senior Backend — Two Sum + System Design
+        <div className="flex items-center gap-2 rounded border border-border px-3 py-2 text-[14px]">
+          <span className="inline-block h-2 w-2 rounded-full bg-primary" />
+          Two Sum Practice
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5 font-mono text-[11px]">
           <span className="rounded border border-primary/40 px-2 py-0.5 text-primary">
-            60 min
+            30 min
           </span>
           <span className="rounded border border-border px-2 py-0.5 text-muted-foreground">
             Python
           </span>
           <span className="rounded border border-border px-2 py-0.5 text-muted-foreground">
-            Video on
+            Solo
           </span>
         </div>
         <div className="mt-3 rounded bg-foreground py-2 text-center font-mono text-[12px] text-background">
-          Copy invite link
+          Start practicing
         </div>
       </div>
     </Panel>
@@ -380,7 +511,7 @@ function CollabMock() {
     seen[n] = i`}
         </pre>
         <div className="col-span-2 p-3">
-          <Label>Board</Label>
+          <Label>Whiteboard</Label>
           <div className="mt-3 space-y-1.5">
             <div className="h-1 w-3/4 bg-primary/40" />
             <div className="h-1 w-1/2 bg-border" />
@@ -407,7 +538,7 @@ function ReviewMock() {
           <div className="flex-1">
             <div className="font-mono text-[12px] font-medium">Session Replay</div>
             <div className="font-mono text-[10px] text-muted-foreground">
-              42 min · Sarah K.
+              42 min · Solo Practice
             </div>
           </div>
         </div>
@@ -416,16 +547,16 @@ function ReviewMock() {
         </div>
         <div className="mt-4 space-y-2 font-mono text-[12px]">
           <div className="flex justify-between border-b border-border pb-1.5">
-            <span className="text-muted-foreground">Code quality</span>
-            <span>4.5 / 5</span>
+            <span className="text-muted-foreground">Problems solved</span>
+            <span>12 / 50</span>
           </div>
           <div className="flex justify-between border-b border-border pb-1.5">
-            <span className="text-muted-foreground">System design</span>
-            <span>4.0 / 5</span>
+            <span className="text-muted-foreground">Success rate</span>
+            <span>75%</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Recommendation</span>
-            <span className="text-primary">Strong hire</span>
+            <span className="text-muted-foreground">Current streak</span>
+            <span className="text-primary">5 days 🔥</span>
           </div>
         </div>
       </div>
@@ -438,18 +569,18 @@ function Benefits() {
   const items = [
     {
       icon: Code2,
-      title: "Realtime Multiplayer Editor",
+      title: "Multiplayer Code Editor",
       body: "See every keystroke live. Syntax highlighting for 30+ languages with instant run and test output.",
     },
     {
       icon: PenTool,
       title: "Whiteboard for System Design",
-      body: "A full Excalidraw canvas — draw architectures, DBs, and API flows with your candidate in realtime.",
+      body: "A full Excalidraw canvas — draw architectures, DBs, and API flows solo or with collaborators.",
     },
     {
       icon: BookOpen,
-      title: "Curated LeetCode Library",
-      body: "Hundreds of vetted problems, filter by topic and difficulty, and clone your own custom question bank.",
+      title: "Curated Problem Library",
+      body: "Hundreds of vetted LeetCode-style problems, filter by topic and difficulty, with test cases.",
     },
     {
       icon: Video,
@@ -461,9 +592,9 @@ function Benefits() {
     <section id="benefits" className="border-b border-border px-6 py-24">
       <div className="mx-auto max-w-6xl">
         <SectionHeader
-          index="02 / Features"
+          index="03 / Features"
           title="What's inside"
-          body="Four core surfaces, all wired together in a single collaborative room."
+          body="Everything you need to practice solo or collaborate — all in one workspace."
         />
         <div className="mt-16 grid border-t border-border sm:grid-cols-2">
           {items.map((it, i) => (
@@ -492,15 +623,15 @@ function Comparison() {
     { label: "Multiplayer code editor", draft: true, others: false, note: "Zoom / Meet only share a screen" },
     { label: "Built-in whiteboard for system design", draft: true, others: false, note: "Requires a second Miro/Excalidraw tab" },
     { label: "HD video in the same room", draft: true, others: false, note: "Coderpad-style tools need an external call" },
-    { label: "Curated problem library", draft: true, others: true, note: "Table stakes — DraftRoom includes it too" },
+    { label: "Curated problem library with test cases", draft: true, others: true, note: "Table stakes — DraftRoom includes it too" },
+    { label: "Solo practice mode", draft: true, others: false, note: "Most tools only focus on interviews" },
     { label: "Session replay with code + canvas + video", draft: true, others: false, note: "Most tools only save the final code" },
-    { label: "Zero install for candidates", draft: true, others: true, note: "" },
   ];
   return (
     <section id="compare" className="border-b border-border px-6 py-24">
       <div className="mx-auto max-w-6xl">
         <SectionHeader
-          index="03 / Comparison"
+          index="04 / Comparison"
           title={
             <>
               Why this is
@@ -508,7 +639,7 @@ function Comparison() {
               actually better.
             </>
           }
-          body="Most interview setups mean juggling three tabs — a video call, a code pad, and a whiteboard. DraftRoom folds them into one screen so the interview stays in flow."
+          body="Most coding platforms are either just practice tools or just interview tools. DraftRoom combines both — whether you're preparing solo or collaborating live."
         />
 
         <div className="mt-16 overflow-hidden rounded-md border border-border bg-card">
@@ -567,16 +698,16 @@ function WorkspacePreview() {
     <section id="preview" className="px-6 py-24">
       <div className="mx-auto max-w-6xl">
         <SectionHeader
-          index="04 / Preview"
-          title="One room. Every tool."
-          body="A single workspace that keeps the interview moving: code, sketch, talk and review — without switching tabs or losing context."
+          index="05 / Preview"
+          title="One workspace. Infinite possibilities."
+          body="A single workspace that adapts to your needs — practice solo, collaborate live, or prepare for interviews without switching tools."
         />
 
         <div className="mt-16 overflow-hidden rounded-md border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border bg-foreground px-4 py-2.5 text-background">
             <div className="flex items-center gap-2 font-mono text-[12px]">
               <span className="inline-block h-2 w-2 rounded-[2px] bg-primary" />
-              draftroom — interview room #42
+              draftroom — workspace #42
             </div>
             <div className="flex items-center gap-3">
               <div className="flex -space-x-1.5">
@@ -651,7 +782,7 @@ function WorkspacePreview() {
                       <div className="h-6 w-6 rounded-full border border-primary" />
                     </div>
                     <p className="mt-3 font-mono text-[11px] text-muted-foreground">
-                      Sketch a system design here
+                      Sketch solutions here
                     </p>
                   </div>
                 </div>
@@ -674,7 +805,7 @@ function WorkspacePreview() {
               <div>
                 <div className="text-[15px] font-medium">Chat & Notes</div>
                 <div className="text-[13px] text-muted-foreground">
-                  Capture side thoughts as you go
+                  Capture thoughts as you go
                 </div>
               </div>
             </div>
@@ -682,7 +813,7 @@ function WorkspacePreview() {
         </div>
 
         <div className="mt-10 flex flex-wrap gap-4">
-          <PrimaryLink href={DEMO_URL}>Get Started</PrimaryLink>
+          <PrimaryLink href="/signup">Start Practicing Free</PrimaryLink>
           <GhostLink href={GITHUB_URL} external>
             <Github className="h-4 w-4" />
             View Source
@@ -701,18 +832,20 @@ function FooterCTA() {
         <div className="grid gap-10 md:grid-cols-12">
           <div className="md:col-span-7">
             <h2 className="text-[48px] leading-[1.05] tracking-tight font-bold md:text-[56px]">
-              Curious how it's built?
+              Practice, prepare, and
+              <br />
+              collaborate freely.
             </h2>
             <p className="mt-5 max-w-lg text-[18px] text-background/70">
-              Poke around the live demo or dive into the source — it's all open.
+              Start coding solo or invite others to join — all in one workspace.
             </p>
           </div>
           <div className="flex flex-wrap items-start gap-3 md:col-span-5 md:justify-end">
             <Link
-              href={DEMO_URL}
+              href="/signup"
               className="inline-flex items-center gap-2 rounded-md bg-background px-6 py-3.5 text-[15px] font-bold text-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
             >
-              Get Started
+              Start Practicing
             </Link>
             <a
               href={GITHUB_URL}
@@ -729,7 +862,7 @@ function FooterCTA() {
         <div className="mt-20 flex flex-col gap-6 border-t border-background/15 pt-8 md:flex-row md:items-center md:justify-between">
           <Logo dark />
           <ul className="flex flex-wrap items-center gap-8 text-[14px] font-medium text-background/70">
-            <li><Link href="#process" className="hover:text-background">Process</Link></li>
+            <li><Link href="#modes" className="hover:text-background">Modes</Link></li>
             <li><Link href="#benefits" className="hover:text-background">Features</Link></li>
             <li><Link href="#compare" className="hover:text-background">Comparison</Link></li>
             <li><Link href="#preview" className="hover:text-background">Preview</Link></li>
@@ -742,8 +875,7 @@ function FooterCTA() {
         </div>
 
         <div className="mt-8 font-mono text-[12px] text-background/50">
-          © {new Date().getFullYear()} DraftRoom — a portfolio project. Designed &
-          built solo.
+          © {new Date().getFullYear()} DraftRoom — a portfolio project. Designed & built solo.
         </div>
       </div>
     </footer>
