@@ -1,4 +1,4 @@
-// app/questions/page.tsx
+// apps/web/app/questions/page.tsx
 "use client";
 
 import { authClient } from "@/lib/auth-client";
@@ -9,8 +9,9 @@ import {
   Search,
   LogOut,
   ArrowLeft,
-  Code2,
   Clock,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 interface User {
@@ -27,100 +28,17 @@ interface Question {
   difficulty: "EASY" | "MEDIUM" | "HARD";
   pattern: string;
   tags: string[];
-  isPublished: boolean;
-  createdAt: string;
+  _count: {
+    testCases: number;
+  };
 }
-
-// Mock data
-const mockQuestions: Question[] = [
-  {
-    id: "1",
-    title: "Two Sum",
-    slug: "two-sum",
-    difficulty: "EASY",
-    pattern: "Algorithms",
-    tags: ["Array", "Hash Map"],
-    isPublished: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "20",
-    title: "Valid Parentheses",
-    slug: "valid-parentheses",
-    difficulty: "EASY",
-    pattern: "Algorithms",
-    tags: ["Stack"],
-    isPublished: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "146",
-    title: "LRU Cache",
-    slug: "lru-cache",
-    difficulty: "MEDIUM",
-    pattern: "Algorithms",
-    tags: ["Design", "Linked List"],
-    isPublished: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "200",
-    title: "Number of Islands",
-    slug: "number-of-islands",
-    difficulty: "MEDIUM",
-    pattern: "Algorithms",
-    tags: ["Graph", "DFS"],
-    isPublished: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "297",
-    title: "Serialize and Deserialize a Tree",
-    slug: "serialize-deserialize-tree",
-    difficulty: "HARD",
-    pattern: "Algorithms",
-    tags: ["Tree", "BFS"],
-    isPublished: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "6",
-    title: "Design Twitter",
-    slug: "design-twitter",
-    difficulty: "HARD",
-    pattern: "System Design",
-    tags: ["Design", "OOD"],
-    isPublished: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "7",
-    title: "Design a URL Shortener",
-    slug: "design-url-shortener",
-    difficulty: "MEDIUM",
-    pattern: "System Design",
-    tags: ["Design", "Scalability"],
-    isPublished: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "8",
-    title: "Rate Limiter Design",
-    slug: "rate-limiter-design",
-    difficulty: "HARD",
-    pattern: "System Design",
-    tags: ["Design", "Distributed Systems"],
-    isPublished: true,
-    createdAt: new Date().toISOString(),
-  },
-];
 
 export default function QuestionsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [questions, setQuestions] = useState<Question[]>(mockQuestions);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPattern, setSelectedPattern] = useState<string>("All");
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("All");
@@ -134,6 +52,7 @@ export default function QuestionsPage() {
           return;
         }
         setUser(data.user);
+        await fetchQuestions();
       } catch (error) {
         console.error("Auth check error:", error);
         router.push("/signin");
@@ -143,6 +62,30 @@ export default function QuestionsPage() {
     };
     checkAuth();
   }, [router]);
+
+  const fetchQuestions = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("search", searchQuery);
+      if (selectedPattern !== "All") params.append("pattern", selectedPattern);
+      if (selectedDifficulty !== "All") params.append("difficulty", selectedDifficulty);
+
+      const response = await fetch(`/api/questions?${params.toString()}`);
+      if (!response.ok) throw new Error("Failed to fetch questions");
+      const data = await response.json();
+      setQuestions(data);
+    } catch (error) {
+      console.error("Error fetching questions:", error);
+    }
+  };
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (user) fetchQuestions();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedPattern, selectedDifficulty]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -165,16 +108,17 @@ export default function QuestionsPage() {
     }
   };
 
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case "EASY": return "text-green-500";
+      case "MEDIUM": return "text-yellow-500";
+      case "HARD": return "text-red-500";
+      default: return "text-muted-foreground";
+    }
+  };
+
   const patterns = ["All", "Algorithms", "System Design"];
   const difficulties = ["All", "EASY", "MEDIUM", "HARD"];
-
-  const filteredQuestions = questions.filter((q) => {
-    const matchesSearch = q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          q.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesPattern = selectedPattern === "All" || q.pattern === selectedPattern;
-    const matchesDifficulty = selectedDifficulty === "All" || q.difficulty === selectedDifficulty;
-    return matchesSearch && matchesPattern && matchesDifficulty;
-  });
 
   if (isLoading) {
     return (
@@ -215,19 +159,12 @@ export default function QuestionsPage() {
       </nav>
 
       <main className="mx-auto max-w-6xl px-4 sm:px-6 py-5 sm:py-6">
-        {/* Header with Back Button */}
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
-            <button
-              onClick={() => router.back()}
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </button>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Problems</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Pick a question before the call or swap it mid-interview — the editor scaffolds the signature and sample tests for you.
+              Browse our curated collection of coding problems
             </p>
           </div>
         </div>
@@ -282,58 +219,71 @@ export default function QuestionsPage() {
 
         {/* Question Table */}
         <div className="border border-border rounded-lg overflow-hidden">
-          <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
+          {/* Table Header */}
+          <div className="grid grid-cols-12 gap-3 px-4 py-3 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
             <div className="col-span-1">#</div>
             <div className="col-span-5">Problem</div>
             <div className="col-span-2 hidden sm:block">Type</div>
             <div className="col-span-2">Difficulty</div>
-            <div className="col-span-2 hidden sm:block">Est.</div>
+            <div className="col-span-2 hidden sm:block">Tests</div>
           </div>
 
+          {/* Table Rows */}
           <div className="divide-y divide-border">
-            {filteredQuestions.length === 0 ? (
+            {questions.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <p className="text-sm">No problems found</p>
                 <p className="text-xs mt-1">Try adjusting your filters</p>
               </div>
             ) : (
-              filteredQuestions.map((question) => (
+              questions.map((question) => (
                 <Link
                   key={question.id}
                   href={`/questions/${question.slug}`}
                   className="grid grid-cols-12 gap-3 px-4 py-3 hover:bg-muted/30 transition-colors group"
                 >
-                  <div className="col-span-1 text-sm text-muted-foreground font-mono">
-                    {question.id}
+                  {/* ID */}
+                  <div className="col-span-1 text-sm text-muted-foreground font-mono truncate">
+                    {question.id.slice(0, 6)}
                   </div>
-                  <div className="col-span-5">
-                    <div className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
+                  
+                  {/* Problem Title + Tags */}
+                  <div className="col-span-5 min-w-0">
+                    <div className="font-medium text-sm text-foreground group-hover:text-primary transition-colors truncate">
                       {question.title}
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                      {question.tags.map((tag) => (
+                      {question.tags.slice(0, 3).map((tag) => (
                         <span
                           key={tag}
-                          className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded"
+                          className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded whitespace-nowrap"
                         >
                           {tag}
                         </span>
                       ))}
+                      {question.tags.length > 3 && (
+                        <span className="text-[10px] text-muted-foreground">
+                          +{question.tags.length - 3}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="col-span-2 hidden sm:flex items-center text-sm text-muted-foreground">
+                  
+                  {/* Type */}
+                  <div className="col-span-2 hidden sm:flex items-center text-sm text-muted-foreground truncate">
                     {question.pattern}
                   </div>
+                  
+                  {/* Difficulty */}
                   <div className="col-span-2 flex items-center">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${getDifficultyBadge(question.difficulty)}`}>
+                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border ${getDifficultyBadge(question.difficulty)}`}>
                       {question.difficulty}
                     </span>
                   </div>
+                  
+                  {/* Test Cases */}
                   <div className="col-span-2 hidden sm:flex items-center text-sm text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5 mr-1.5" />
-                    {question.difficulty === "EASY" ? "15 min" :
-                     question.difficulty === "MEDIUM" ? "25-30 min" :
-                     "35-40 min"}
+                    {question._count.testCases}
                   </div>
                 </Link>
               ))
@@ -341,21 +291,21 @@ export default function QuestionsPage() {
           </div>
         </div>
 
-        {/* Quick Stats */}
+        {/* Footer Stats */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>
-            Showing {filteredQuestions.length} of {questions.length} problems
+            Showing {questions.length} problems
           </span>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5">
               <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
               Easy ({questions.filter(q => q.difficulty === "EASY").length})
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />
               Medium ({questions.filter(q => q.difficulty === "MEDIUM").length})
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
               Hard ({questions.filter(q => q.difficulty === "HARD").length})
             </span>

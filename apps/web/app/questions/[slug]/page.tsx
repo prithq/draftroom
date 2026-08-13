@@ -1,6 +1,7 @@
 // apps/web/app/questions/[slug]/page.tsx
 "use client";
 
+import { use } from "react";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -17,7 +18,7 @@ interface User {
   id: string;
   name?: string;
   email: string;
-  image?: string;
+  image?: string | null;
 }
 
 interface TestCase {
@@ -40,50 +41,17 @@ interface Question {
   testCases: TestCase[];
 }
 
-// Mock data - replace with real API call
-const mockQuestion: Question = {
-  id: "1",
-  title: "Budget Pair",
-  slug: "budget-pair",
-  description: `You are given a list of product prices sorted in ascending order, and a budget. Find two products whose prices sum up to exactly the budget.
+// ✅ Next.js 16 - params is a Promise, use React.use()
+export default function QuestionDetailPage({ 
+  params 
+}: { 
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = use(params);
+  return <QuestionDetailClient slug={slug} />;
+}
 
-Return the indices (1-based) of the two products. If no such pair exists, return an empty array.
-
-**Note:** The array is 1-indexed.`,
-  difficulty: "EASY",
-  pattern: "two-pointers",
-  tags: ["array", "two-pointers"],
-  starterCode: {
-    javascript: `function budgetPair(prices, budget) {\n  // your code here\n}`,
-    python: `def budget_pair(prices, budget):\n    # your code here\n    pass`,
-    go: `func budgetPair(prices []int, budget int) []int {\n    // your code here\n    return []int{}\n}`,
-  },
-  testCases: [
-    {
-      id: "1",
-      input: { prices: [5, 11, 15, 20, 35], budget: 26 },
-      expected: [2, 4],
-      isHidden: false,
-      weight: 1,
-    },
-    {
-      id: "2",
-      input: { prices: [3, 7, 9, 14], budget: 20 },
-      expected: [],
-      isHidden: false,
-      weight: 1,
-    },
-    {
-      id: "3",
-      input: { prices: [1, 2, 3, 4, 5], budget: 10 },
-      expected: [4, 5],
-      isHidden: true,
-      weight: 2,
-    },
-  ],
-};
-
-export default function QuestionDetailPage({ params }: { params: { slug: string } }) {
+function QuestionDetailClient({ slug }: { slug: string }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,29 +59,45 @@ export default function QuestionDetailPage({ params }: { params: { slug: string 
   const [question, setQuestion] = useState<Question | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [isUsingRoom, setIsUsingRoom] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const init = async () => {
       try {
-        const { data, error } = await authClient.getSession();
-        if (error || !data?.user) {
+        // 1. Check authentication
+        const session = await authClient.getSession();
+        if (session?.error || !session?.data?.user) {
           router.push("/signin");
           return;
         }
-        setUser(data.user);
+        setUser(session.data.user);
         
-        // TODO: Fetch real question from /api/questions/:slug
-        // For now, use mock data
-        setQuestion(mockQuestion);
+        // 2. Fetch question using the slug
+        // The API route now handles both ID and slug
+        const response = await fetch(`/api/questions/${slug}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError("Question not found");
+          } else {
+            throw new Error(`Failed to fetch question: ${response.status}`);
+          }
+          return;
+        }
+        
+        const questionData = await response.json();
+        setQuestion(questionData);
+        
       } catch (error) {
-        console.error("Auth check error:", error);
-        router.push("/signin");
+        console.error("Error:", error);
+        setError(error instanceof Error ? error.message : "Failed to load question");
       } finally {
         setIsLoading(false);
       }
     };
-    checkAuth();
-  }, [router, params.slug]);
+    
+    init();
+  }, [router, slug]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -139,7 +123,7 @@ export default function QuestionDetailPage({ params }: { params: { slug: string 
   const handleUseInRoom = async () => {
     setIsUsingRoom(true);
     try {
-      router.push(`/rooms/create?question=${question?.slug}`);
+      router.push(`/rooms/create?question=${question?.id}`);
     } catch (error) {
       console.error("Error using question:", error);
     } finally {
@@ -155,12 +139,33 @@ export default function QuestionDetailPage({ params }: { params: { slug: string 
     return JSON.stringify(output);
   };
 
-  if (isLoading || !question) {
+  // Loading state
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-foreground border-t-transparent" />
           <p className="text-muted-foreground text-sm">Loading problem...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !question) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-red-500 text-4xl mb-2">⚠️</div>
+          <h2 className="text-xl font-semibold">Something went wrong</h2>
+          <p className="text-muted-foreground text-sm">{error || "Question not found"}</p>
+          <button
+            onClick={() => router.back()}
+            className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Go Back
+          </button>
         </div>
       </div>
     );
@@ -268,20 +273,6 @@ export default function QuestionDetailPage({ params }: { params: { slug: string 
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Constraints */}
-        <div className="mb-6">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Constraints
-          </h2>
-          <div className="border border-border rounded-lg p-4">
-            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-              <li>2 ≤ prices.length ≤ 10⁴</li>
-              <li>1 ≤ prices[i] ≤ 10⁵</li>
-              <li>prices is sorted in ascending order</li>
-            </ul>
           </div>
         </div>
 
