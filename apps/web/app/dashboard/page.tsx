@@ -16,10 +16,10 @@ import {
   Users,
   Search,
   User,
-  Calendar,
   Code2,
   Check,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 
 interface User {
@@ -91,6 +91,7 @@ export default function DashboardPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [joinedRooms, setJoinedRooms] = useState<JoinedRoom[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   
   // UI State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -119,8 +120,7 @@ export default function DashboardPage() {
           return;
         }
         setUser(session.data.user);
-        await fetchRooms();
-        await fetchJoinedRooms();
+        await Promise.all([fetchRooms(), fetchJoinedRooms()]);
       } catch (error) {
         console.error("Auth check error:", error);
         router.push("/signin");
@@ -135,29 +135,45 @@ export default function DashboardPage() {
   // Fetch rooms the user owns
   const fetchRooms = async () => {
     try {
+      setFetchError(null);
       const response = await fetch("/api/rooms");
-      if (!response.ok) throw new Error("Failed to fetch rooms");
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to fetch rooms: ${response.status}`);
+      }
+      
       const data = await response.json();
       setRooms(data);
     } catch (error) {
       console.error("Error fetching rooms:", error);
+      setFetchError(error instanceof Error ? error.message : "Failed to fetch rooms");
     }
   };
 
   // Fetch rooms the user joined as candidate
   const fetchJoinedRooms = async () => {
     try {
-      // For joined rooms, we need to fetch rooms where user is a participant
-      // This might require a different endpoint or filtering
-      // For now, we'll use a mock or separate API call
-      // You might need to add a /api/rooms/joined endpoint
+      // Try to fetch joined rooms - if the endpoint doesn't exist, just set empty array
       const response = await fetch("/api/rooms/joined");
-      if (response.ok) {
-        const data = await response.json();
-        setJoinedRooms(data);
+      
+      if (response.status === 404) {
+        // Endpoint doesn't exist yet - that's fine
+        setJoinedRooms([]);
+        return;
       }
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to fetch joined rooms: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setJoinedRooms(data);
     } catch (error) {
       console.error("Error fetching joined rooms:", error);
+      // Don't show error for joined rooms - it's optional
+      setJoinedRooms([]);
     }
   };
 
@@ -470,10 +486,31 @@ export default function DashboardPage() {
                   className="w-full sm:w-40 pl-8 pr-3 py-1 text-sm border border-border rounded-lg bg-transparent focus:border-foreground focus:outline-none"
                 />
               </div>
+              {fetchError && (
+                <button
+                  onClick={fetchRooms}
+                  className="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-400 transition-colors"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Retry
+                </button>
+              )}
             </div>
           </div>
 
-          {isLoadingRooms ? (
+          {fetchError ? (
+            <div className="text-center py-12 border border-red-500/20 bg-red-500/5 rounded-lg">
+              <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+              <p className="text-sm text-red-500">{fetchError}</p>
+              <button
+                onClick={fetchRooms}
+                className="mt-3 inline-flex items-center gap-2 rounded-md border border-red-500/30 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Try Again
+              </button>
+            </div>
+          ) : isLoadingRooms ? (
             <div className="text-center py-8">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-foreground border-t-transparent mx-auto" />
             </div>
