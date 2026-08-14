@@ -19,17 +19,12 @@ export async function GET(request: NextRequest) {
     const pattern = searchParams.get("pattern");
     const search = searchParams.get("search");
 
-    const whereObj: {
-      isPublished: boolean;
-      difficulty?: "EASY" | "MEDIUM" | "HARD";
-      pattern?: string;
-      title?: { contains: string; mode: "insensitive" };
-    } = {
+    const whereObj: any = {
       isPublished: true
     };
 
     if (difficulty && ["EASY", "MEDIUM", "HARD"].includes(difficulty)) {
-      whereObj.difficulty = difficulty as "EASY" | "MEDIUM" | "HARD";
+      whereObj.difficulty = difficulty;
     }
 
     if (pattern) {

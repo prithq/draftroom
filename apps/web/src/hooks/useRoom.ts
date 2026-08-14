@@ -53,11 +53,11 @@ export function useRoom({
   const [error, setError] = useState<string | null>(null);
   const [currentSocketId, setCurrentSocketId] = useState<string>("");
 
-  // Refs for cleanup and preventing duplicate events
   const eventHandlers = useRef<Map<string, (...args: any[]) => void>>(new Map());
   const isMounted = useRef(true);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     isMounted.current = true;
@@ -72,6 +72,7 @@ export function useRoom({
       timeout: 10000,
     });
 
+    socketRef.current = socketInstance;
     setSocket(socketInstance);
 
     // Socket event handlers
@@ -108,7 +109,6 @@ export function useRoom({
       setIsConnected(false);
       
       if (reason === "io server disconnect") {
-        // Server disconnected us, try to reconnect manually
         socketInstance.connect();
       }
     });
@@ -118,7 +118,6 @@ export function useRoom({
       setIsConnected(true);
       setError(null);
       
-      // Rejoin the room
       socketInstance.emit("join-room", {
         roomId,
         userId,
@@ -150,20 +149,14 @@ export function useRoom({
       }
     });
 
-    // Listen for code changes from other users
-    socketInstance.on("code-change", ({ code: newCode, fromSocketId }: { code: string; fromSocketId: string }) => {
-      // Ignore if we sent the change
-      if (fromSocketId !== socketInstance.id) {
-        setCode(newCode);
-      }
+    // 🔧 FIX: Code change from server - the server sends just the code string
+    socketInstance.on("code-change", (newCode: string) => {
+      setCode(newCode);
     });
 
-    // Listen for canvas changes from other users
-    socketInstance.on("canvas-change", ({ elements, fromSocketId }: { elements: any[]; fromSocketId: string }) => {
-      // Ignore if we sent the change
-      if (fromSocketId !== socketInstance.id) {
-        setCanvasElements(elements);
-      }
+    // 🔧 FIX: Canvas change from server - the server sends just the elements array
+    socketInstance.on("canvas-change", (elements: any[]) => {
+      setCanvasElements(elements);
     });
 
     // Listen for cursor updates
@@ -189,16 +182,13 @@ export function useRoom({
       isMounted.current = false;
       
       if (socketInstance) {
-        // Leave the room before disconnecting
         socketInstance.emit("leave-room", { roomId });
         
-        // Remove all event listeners
         eventHandlers.current.forEach((handler, event) => {
           socketInstance.off(event, handler);
         });
         eventHandlers.current.clear();
         
-        // Disconnect
         socketInstance.disconnect();
       }
     };
@@ -206,95 +196,93 @@ export function useRoom({
 
   // Emit code changes
   const handleCodeChange = useCallback((newCode: string) => {
-    if (!socket || !isConnected) {
-      // Store locally if not connected
+    if (!socketRef.current || !isConnected) {
       setCode(newCode);
       return;
     }
     
     setCode(newCode);
-    socket.emit("code-change", {
+    socketRef.current.emit("code-change", {
       roomId,
       code: newCode,
     });
-  }, [socket, roomId, isConnected]);
+  }, [roomId, isConnected]);
 
   // Emit canvas changes
   const handleCanvasChange = useCallback((elements: any[]) => {
-    if (!socket || !isConnected) return;
+    if (!socketRef.current || !isConnected) return;
     
     setCanvasElements(elements);
-    socket.emit("canvas-change", {
+    socketRef.current.emit("canvas-change", {
       roomId,
       elements,
     });
-  }, [socket, roomId, isConnected]);
+  }, [roomId, isConnected]);
 
   // Emit cursor movement
   const handleCursorMove = useCallback((x: number, y: number) => {
-    if (!socket || !isConnected) return;
+    if (!socketRef.current || !isConnected) return;
     
-    socket.emit("cursor-move", {
+    socketRef.current.emit("cursor-move", {
       roomId,
       x,
       y,
     });
-  }, [socket, roomId, isConnected]);
+  }, [roomId, isConnected]);
 
   // Subscribe to events
   const on = useCallback((event: string, handler: (data: any) => void) => {
-    if (!socket) {
+    if (!socketRef.current) {
       console.warn(`Cannot subscribe to ${event}: socket not connected`);
       return () => {};
     }
     
-    // Wrap handler to only execute if mounted
     const wrappedHandler = (data: any) => {
       if (isMounted.current) {
         handler(data);
       }
     };
     
-    socket.on(event, wrappedHandler);
+    socketRef.current.on(event, wrappedHandler);
     eventHandlers.current.set(event, wrappedHandler);
     
     return () => {
-      socket.off(event, wrappedHandler);
+      if (socketRef.current) {
+        socketRef.current.off(event, wrappedHandler);
+      }
       eventHandlers.current.delete(event);
     };
-  }, [socket]);
+  }, []);
 
   // Emit events
   const emit = useCallback((event: string, data: any) => {
-    if (!socket || !isConnected) {
+    if (!socketRef.current || !isConnected) {
       console.warn(`Cannot emit ${event}: socket not connected`);
       return;
     }
-    socket.emit(event, data);
-  }, [socket, isConnected]);
+    socketRef.current.emit(event, data);
+  }, [isConnected]);
 
   // Cleanup all connections
   const cleanup = useCallback(() => {
-    if (socket && isConnected) {
-      socket.emit("leave-room", { roomId });
+    if (socketRef.current && isConnected) {
+      socketRef.current.emit("leave-room", { roomId });
     }
     
-    // Clear all registered event handlers
-    if (socket) {
+    if (socketRef.current) {
       eventHandlers.current.forEach((handler, event) => {
-        socket.off(event, handler);
+        socketRef.current?.off(event, handler);
       });
       eventHandlers.current.clear();
     }
     
-    // Clear local state
     setUsers([]);
     setCursors({});
     setError(null);
-  }, [socket, roomId, isConnected]);
+  }, [roomId, isConnected]);
 
   return {
-    socket,
+    socket: socketRef.current,
     users,
     code,
     canvasElements,

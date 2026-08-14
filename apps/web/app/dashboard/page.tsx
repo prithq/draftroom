@@ -228,43 +228,55 @@ export default function DashboardPage() {
       setIsCreating(false);
     }
   };
+const handleJoinRoom = async () => {
+  if (!joinLink.trim()) {
+    setJoinError("Please enter a room link or ID");
+    return;
+  }
 
-  const handleJoinRoom = async () => {
-    if (!joinLink.trim()) {
-      setJoinError("Please enter a room link or ID");
-      return;
+  setIsJoining(true);
+  setJoinError(null);
+
+  try {
+    // Extract room ID from link or use directly
+    let roomId = joinLink.trim();
+    
+    // If it's a full URL, extract the slug
+    if (roomId.includes('/room/')) {
+      const parts = roomId.split('/room/');
+      roomId = parts[parts.length - 1];
+    }
+    
+    // Remove any trailing slashes
+    roomId = roomId.replace(/\/$/, '');
+    
+    console.log(`🔍 Joining room with ID/slug: ${roomId}`);
+
+    const response = await fetch(`/api/rooms/${roomId}/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to join room");
     }
 
-    setIsJoining(true);
-    setJoinError(null);
-
-    try {
-      // Extract room ID from link or use directly
-      const roomId = joinLink.split("/").pop() || joinLink;
-      
-      const response = await fetch(`/api/rooms/${roomId}/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to join room");
-      }
-
-      const data = await response.json();
-      setIsJoinModalOpen(false);
-      setJoinLink("");
-      
-      // Navigate to the room
-      router.push(`/room/${data.room.slug}`);
-    } catch (error) {
-      console.error("Join room error:", error);
-      setJoinError(error instanceof Error ? error.message : "Failed to join room");
-    } finally {
-      setIsJoining(false);
-    }
-  };
+    const data = await response.json();
+    console.log("✅ Successfully joined room:", data.room.name);
+    
+    setIsJoinModalOpen(false);
+    setJoinLink("");
+    
+    // Navigate to the room
+    router.push(`/room/${data.room.slug}`);
+  } catch (error) {
+    console.error("Join room error:", error);
+    setJoinError(error instanceof Error ? error.message : "Failed to join room");
+  } finally {
+    setIsJoining(false);
+  }
+};
 
   const handleCopyLink = async (slug: string, id: string) => {
     const link = `${window.location.origin}/room/${slug}`;

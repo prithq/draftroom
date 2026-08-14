@@ -18,7 +18,7 @@ interface User {
   id: string;
   name?: string;
   email: string;
-  image?: string;
+  image?: string|null;
 }
 
 interface Question {
@@ -137,7 +137,7 @@ export default function QuestionsPage() {
       <nav className="border-b border-border px-4 sm:px-6 py-3 bg-background/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="mx-auto max-w-6xl flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-primary" />
+            <span className="inline-block h-2.5 w-2.5 rounded-xs bg-primary" />
             <span className="text-[16px] sm:text-[18px] font-bold tracking-tight">draftroom</span>
           </Link>
           <div className="flex items-center gap-3 sm:gap-4">
@@ -159,9 +159,16 @@ export default function QuestionsPage() {
       </nav>
 
       <main className="mx-auto max-w-6xl px-4 sm:px-6 py-5 sm:py-6">
-        {/* Header */}
+        {/* Header with Back Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </button>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Problems</h1>
             <p className="text-sm text-muted-foreground mt-1">
               Browse our curated collection of coding problems
@@ -221,7 +228,7 @@ export default function QuestionsPage() {
         <div className="border border-border rounded-lg overflow-hidden">
           {/* Table Header */}
           <div className="grid grid-cols-12 gap-3 px-4 py-3 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
-            <div className="col-span-1">#</div>
+            <div className="col-span-1 text-center">#</div>
             <div className="col-span-5">Problem</div>
             <div className="col-span-2 hidden sm:block">Type</div>
             <div className="col-span-2">Difficulty</div>
@@ -236,15 +243,15 @@ export default function QuestionsPage() {
                 <p className="text-xs mt-1">Try adjusting your filters</p>
               </div>
             ) : (
-              questions.map((question) => (
+              questions.map((question, index) => (
                 <Link
                   key={question.id}
                   href={`/questions/${question.slug}`}
                   className="grid grid-cols-12 gap-3 px-4 py-3 hover:bg-muted/30 transition-colors group"
                 >
-                  {/* ID */}
-                  <div className="col-span-1 text-sm text-muted-foreground font-mono truncate">
-                    {question.id.slice(0, 6)}
+                  {/* # - Sequential number */}
+                  <div className="col-span-1 text-sm text-muted-foreground font-mono text-center">
+                    {index + 1}
                   </div>
                   
                   {/* Problem Title + Tags */}
