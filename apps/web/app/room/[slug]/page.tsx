@@ -6,6 +6,7 @@ import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { LobbyView } from "./lobby";
+import { InterviewView } from "./interview";
 
 // Import hooks
 import { useRoom } from "@/src/hooks/useRoom";
@@ -59,6 +60,12 @@ function RoomClient({ slug }: { slug: string }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showVideo, setShowVideo] = useState(true);
   
+  // Editor State
+  const [code, setCode] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("javascript");
+  const [output, setOutput] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
+  
   // Room data for hooks
   const [roomId, setRoomId] = useState<string>("");
   const [userId, setUserId] = useState<string>("");
@@ -69,7 +76,7 @@ function RoomClient({ slug }: { slug: string }) {
   const {
     socket,
     users: roomUsers,
-    code,
+    code: syncedCode,
     canvasElements,
     cursors,
     isConnected,
@@ -114,6 +121,20 @@ function RoomClient({ slug }: { slug: string }) {
       color: u.color,
     })),
   });
+
+  // Update code when synced code changes
+  useEffect(() => {
+    if (syncedCode) {
+      setCode(syncedCode);
+    }
+  }, [syncedCode]);
+
+  // Set language from room
+  useEffect(() => {
+    if (room?.language) {
+      setSelectedLanguage(room.language);
+    }
+  }, [room]);
 
   // Fetch room data and auto-join
   useEffect(() => {
@@ -162,16 +183,41 @@ function RoomClient({ slug }: { slug: string }) {
 
         const roomData = await response.json();
         console.log("✅ Room fetched:", roomData.name);
+        console.log("📊 Room owner:", roomData.ownerId);
+        console.log("👤 Current user:", userData.id);
+        
         setRoom(roomData);
         setRoomId(roomData.id);
+
+        // Set initial code from question starter
+        if (roomData.question?.starterCode) {
+          const starter = roomData.question.starterCode[roomData.language] || "";
+          setCode(starter);
+        }
 
         // Check if user is owner or participant
         const isOwner = roomData.ownerId === userData.id;
         const isParticipant = roomData.participant?.some(p => p.userId === userData.id);
 
+        console.log("📊 Is owner:", isOwner);
+        console.log("📊 Is participant:", isParticipant);
+
+        // If the user is the owner, they don't need to join
+        if (isOwner) {
+          console.log("👑 User is the owner, no need to join");
+          setIsJoining(false);
+          // For solo mode, auto-start interview
+          if (roomData.roomType === "SOLO") {
+            setViewMode("interview");
+            setShowVideo(false);
+          }
+          setIsLoading(false);
+          return;
+        }
+
         // If not owner and not participant, auto-join
-        if (!isOwner && !isParticipant) {
-          console.log("🔄 User is not a participant, auto-joining...");
+        if (!isParticipant) {
+          console.log("🔄 User is not a participant, auto-joining as CANDIDATE...");
           setIsJoining(true);
           
           try {
@@ -182,7 +228,7 @@ function RoomClient({ slug }: { slug: string }) {
 
             if (joinResponse.ok) {
               const joinData = await joinResponse.json();
-              console.log("✅ Auto-joined successfully:", joinData.message);
+              console.log("✅ Auto-joined successfully as:", joinData.role);
               
               // Refresh room data to get updated participant list
               const updatedResponse = await fetch(`/api/rooms/${slug}`);
@@ -193,14 +239,16 @@ function RoomClient({ slug }: { slug: string }) {
             } else {
               const errorData = await joinResponse.json();
               console.warn("⚠️ Auto-join failed:", errorData.error);
-              // Don't block the user - they can still view the room
+              // Show error but don't block
+              setError("Could not join room. You may already be a participant.");
             }
           } catch (joinError) {
             console.warn("⚠️ Auto-join error:", joinError);
-            // Don't block the user
           } finally {
             setIsJoining(false);
           }
+        } else {
+          console.log("✅ User is already a participant");
         }
 
         // Auto-show interview for solo mode
@@ -253,6 +301,52 @@ function RoomClient({ slug }: { slug: string }) {
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRunCode = async () => {
+    if (!room?.question) return;
+    
+    setIsRunning(true);
+    setOutput("Running tests...\n");
+    
+    try {
+      const response = await fetch("/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          language: selectedLanguage,
+          questionId: room.questionId,
+          roomId: room.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to run code");
+      }
+
+      const result = await response.json();
+      
+      let outputText = "";
+      if (result.stdout) {
+        outputText += result.stdout;
+      }
+      if (result.stderr) {
+        outputText += `\n\n❌ Error:\n${result.stderr}`;
+      }
+      if (result.compile_output) {
+        outputText += `\n\n⚠️ Compile Output:\n${result.compile_output}`;
+      }
+      
+      setOutput(outputText || "No output");
+      
+    } catch (error) {
+      console.error("Run error:", error);
+      setOutput(`Error: ${error instanceof Error ? error.message : "Failed to run code"}`);
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   // Loading state
@@ -323,20 +417,48 @@ function RoomClient({ slug }: { slug: string }) {
     );
   }
 
-  // Interview View - Coming soon
+  // Interview View
+  const languages = room?.question?.starterCode ? Object.keys(room.question.starterCode) : ["javascript"];
+  
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="text-center">
-        <div className="text-4xl mb-4">🚧</div>
-        <h2 className="text-2xl font-bold text-white">Interview View</h2>
-        <p className="text-white/60 text-sm mt-2">Coding environment coming soon...</p>
-        <button
-          onClick={() => setViewMode("lobby")}
-          className="mt-4 inline-flex items-center gap-2 rounded-md border border-white/20 px-4 py-2 text-sm font-medium text-white/80 hover:text-white hover:border-white/40 transition-colors"
-        >
-          Back to Call
-        </button>
-      </div>
-    </div>
+    <InterviewView
+      room={room}
+      user={user}
+      isInterviewer={user?.id === room.ownerId}
+      question={room.question}
+      code={code}
+      selectedLanguage={selectedLanguage}
+      languages={languages}
+      output={output}
+      isRunning={isRunning}
+      canvasElements={canvasElements}
+      cursors={cursors}
+      currentSocketId={socketId || ""}
+      onCodeChange={(newCode) => {
+        setCode(newCode);
+        handleCodeChange(newCode);
+      }}
+      onLanguageChange={(lang) => {
+        setSelectedLanguage(lang);
+        if (room.question?.starterCode) {
+          setCode(room.question.starterCode[lang] || "");
+        }
+      }}
+      onRunCode={handleRunCode}
+      onCanvasChange={handleCanvasChange}
+      onBackToLobby={() => setViewMode("lobby")}
+      onLeave={handleLeave}
+      localStream={localStream}
+      peers={peers}
+      roomUsers={roomUsers}
+      audioEnabled={audioEnabled}
+      videoEnabled={videoEnabled}
+      isConnected={isConnected}
+      toggleAudio={toggleAudio}
+      toggleVideo={toggleVideo}
+      participantCount={room.participant?.length || 0}
+      copyInviteLink={copyInviteLink}
+      copied={copied}
+    />
   );
 }
