@@ -38,6 +38,7 @@ export function QuestionPicker({
   const [selectedPattern, setSelectedPattern] = useState<string>("All");
   const [isSelecting, setIsSelecting] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(currentQuestionId || null);
+  const [error, setError] = useState<string | null>(null);
 
   const difficulties = ["All", "EASY", "MEDIUM", "HARD"];
   const patterns = ["All", "Algorithms", "System Design"];
@@ -47,18 +48,29 @@ export function QuestionPicker({
 
     const fetchQuestions = async () => {
       setIsLoading(true);
+      setError(null);
       try {
         const params = new URLSearchParams();
         if (searchQuery) params.append("search", searchQuery);
         if (selectedDifficulty !== "All") params.append("difficulty", selectedDifficulty);
         if (selectedPattern !== "All") params.append("pattern", selectedPattern);
 
+        console.log("🔍 Fetching questions with params:", params.toString());
+        
         const response = await fetch(`/api/questions?${params.toString()}`);
-        if (!response.ok) throw new Error("Failed to fetch questions");
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error("❌ API Error:", errorData);
+          throw new Error(errorData.error || `Failed to fetch questions: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log("✅ Questions fetched:", data.length);
         setQuestions(data);
       } catch (error) {
         console.error("Error fetching questions:", error);
+        setError(error instanceof Error ? error.message : "Failed to fetch questions");
       } finally {
         setIsLoading(false);
       }
@@ -86,6 +98,7 @@ export function QuestionPicker({
       }, 500);
     } catch (error) {
       console.error("Error selecting question:", error);
+      setError(error instanceof Error ? error.message : "Failed to select question");
     } finally {
       setIsSelecting(null);
     }
@@ -118,6 +131,7 @@ export function QuestionPicker({
         {/* Search & Filters */}
         <div className="p-4 border-b border-border shrink-0">
           <div className="flex flex-col sm:flex-row gap-3">
+            {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
@@ -129,6 +143,7 @@ export function QuestionPicker({
               />
             </div>
 
+            {/* Filters */}
             <div className="flex flex-wrap gap-2">
               <div className="flex gap-1 p-1 border border-border rounded-lg">
                 {difficulties.map((diff) => (
@@ -164,6 +179,13 @@ export function QuestionPicker({
             </div>
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mx-4 mt-2 p-2 border border-red-500/20 bg-red-500/10 rounded text-xs text-red-500">
+            {error}
+          </div>
+        )}
 
         {/* Question List */}
         <div className="flex-1 overflow-y-auto p-4">

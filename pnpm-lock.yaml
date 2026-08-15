@@ -87,7 +87,7 @@ importers:
         specifier: ^1.7.2
         version: 1.7.2(next@16.2.0(@babel/core@7.29.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(sass@1.51.0))
       lucide-react:
-        specifier: ^0.17.0
+        specifier: ^0.17.17
         version: 0.17.17(prop-types@15.8.1)(react@19.2.0)
       next:
         specifier: 16.2.0

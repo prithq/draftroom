@@ -28,6 +28,7 @@ import {
 
 import { Whiteboard } from "@/components/Whiteboard";
 import { QuestionPicker } from "@/components/QuestionPicker";
+import { CodeEditor } from "@/components/CodeEditor";
 
 interface User {
   id: string;
@@ -110,6 +111,8 @@ interface InterviewProps {
   copied: boolean;
 }
 
+type CenterTab = "code" | "whiteboard";
+
 export function InterviewView({
   room,
   user,
@@ -143,12 +146,12 @@ export function InterviewView({
   copied,
 }: InterviewProps) {
   const [showQuestion, setShowQuestion] = useState(true);
-  const [showWhiteboard, setShowWhiteboard] = useState(true);
-  const [showVideoBar, setShowVideoBar] = useState(true);
+  const [centerTab, setCenterTab] = useState<CenterTab>("code");
   const [showParticipants, setShowParticipants] = useState(false);
   const [showQuestionPicker, setShowQuestionPicker] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -182,6 +185,7 @@ export function InterviewView({
   }, [localStream, videoEnabled]);
 
   const handleSelectQuestion = async (questionId: string) => {
+    setIsUpdatingQuestion(true);
     try {
       const response = await fetch(`/api/rooms/${room.id}/question`, {
         method: "PATCH",
@@ -209,6 +213,8 @@ export function InterviewView({
     } catch (error) {
       console.error("Error selecting question:", error);
       throw error;
+    } finally {
+      setIsUpdatingQuestion(false);
     }
   };
 
@@ -245,6 +251,20 @@ export function InterviewView({
   };
 
   const isSolo = room.roomType === "SOLO";
+
+  // Get language for Monaco
+  const getMonacoLanguage = (lang: string) => {
+    const map: Record<string, string> = {
+      javascript: "javascript",
+      typescript: "typescript",
+      python: "python",
+      go: "go",
+      java: "java",
+      cpp: "cpp",
+      rust: "rust",
+    };
+    return map[lang] || "javascript";
+  };
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -283,14 +303,6 @@ export function InterviewView({
             )}
           </button>
           <button
-            onClick={() => setShowVideoBar(!showVideoBar)}
-            className={`p-1 rounded transition-colors ${
-              showVideoBar ? "text-primary" : "text-muted-foreground"
-            }`}
-          >
-            <VideoIcon className="h-4 w-4" />
-          </button>
-          <button
             onClick={() => setShowParticipants(!showParticipants)}
             className="text-muted-foreground hover:text-foreground transition-colors p-1"
           >
@@ -311,71 +323,16 @@ export function InterviewView({
         </div>
       </nav>
 
-      {/* Video Bar */}
-      {showVideoBar && (localStream || peers.length > 0) && (
-        <div className="bg-black/90 border-b border-border p-1.5 flex items-center gap-2 overflow-x-auto shrink-0">
-          {localStream && (
-            <div className="relative w-24 h-14 rounded overflow-hidden bg-black/50 shrink-0">
-              <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
-              <div className="absolute bottom-0.5 left-1 text-[8px] text-white/80 bg-black/50 px-1 rounded">
-                {user?.name || "You"}
-              </div>
-              <div className="absolute bottom-0.5 right-1 flex gap-0.5">
-                {!audioEnabled && <MicOff className="h-2.5 w-2.5 text-red-400" />}
-                {!videoEnabled && <VideoOff className="h-2.5 w-2.5 text-red-400" />}
-              </div>
-            </div>
-          )}
-          {peers.map((peer) => (
-            <div key={peer.socketId} className="relative w-24 h-14 rounded overflow-hidden bg-black/50 shrink-0">
-              <video
-                ref={(el) => {
-                  if (el) remoteVideoRefs.current.set(peer.socketId, el);
-                }}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute bottom-0.5 left-1 text-[8px] text-white/80 bg-black/50 px-1 rounded">
-                {peer.name}
-              </div>
-            </div>
-          ))}
-          <div className="flex items-center gap-1 ml-auto shrink-0">
-            <button
-              onClick={toggleAudio}
-              className={`p-1 rounded transition-colors ${
-                audioEnabled ? "text-white hover:bg-white/10" : "text-red-400 hover:bg-red-500/20"
-              }`}
-            >
-              {audioEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-            </button>
-            <button
-              onClick={toggleVideo}
-              className={`p-1 rounded transition-colors ${
-                videoEnabled ? "text-white hover:bg-white/10" : "text-red-400 hover:bg-red-500/20"
-              }`}
-            >
-              {videoEnabled ? <VideoIcon className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
-            </button>
-            <button
-              onClick={() => setShowVideoBar(false)}
-              className="p-1 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
+      {/* Main Content - 3 Column Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Question */}
+        {/* Left Panel - Question (30%) */}
         {showQuestion && (
           <div className="w-80 border-r border-border bg-card/30 overflow-y-auto shrink-0">
             <div className="p-3">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Problem</h3>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  {question ? "Problem" : "No Question Selected"}
+                </h3>
                 <button
                   onClick={() => setShowQuestion(false)}
                   className="text-muted-foreground hover:text-foreground"
@@ -386,6 +343,7 @@ export function InterviewView({
 
               {question ? (
                 <div className="space-y-3">
+                  {/* Title & Difficulty */}
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${getDifficultyBadge(question.difficulty)}`}>
@@ -396,10 +354,12 @@ export function InterviewView({
                     <h4 className="text-sm font-bold">{question.title}</h4>
                   </div>
 
+                  {/* Description */}
                   <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
                     {question.description}
                   </div>
 
+                  {/* Examples */}
                   {question.testCases && question.testCases.length > 0 && (
                     <div>
                       <h5 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
@@ -414,6 +374,19 @@ export function InterviewView({
                     </div>
                   )}
 
+                  {/* Constraints */}
+                  <div>
+                    <h5 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                      Constraints
+                    </h5>
+                    <ul className="list-disc list-inside space-y-0.5 text-[10px] text-muted-foreground">
+                      <li>2 ≤ prices.length ≤ 10⁴</li>
+                      <li>1 ≤ prices[i] ≤ 10⁵</li>
+                      <li>Prices is sorted in ascending order</li>
+                    </ul>
+                  </div>
+
+                  {/* Interviewer Notes */}
                   {isInterviewer && (
                     <div className="border border-yellow-500/20 bg-yellow-500/5 rounded p-2">
                       <h5 className="text-[10px] font-semibold text-yellow-500 uppercase tracking-wider">Notes</h5>
@@ -421,12 +394,14 @@ export function InterviewView({
                     </div>
                   )}
 
+                  {/* Change Question (Interviewer only) */}
                   {isInterviewer && (
                     <button
                       onClick={() => setShowQuestionPicker(true)}
-                      className="w-full text-[10px] text-primary hover:underline py-1 border-t border-border mt-2"
+                      disabled={isUpdatingQuestion}
+                      className="w-full text-[10px] text-primary hover:underline py-1 border-t border-border mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Change Question →
+                      {isUpdatingQuestion ? "Updating..." : "Change Question →"}
                     </button>
                   )}
                 </div>
@@ -447,184 +422,260 @@ export function InterviewView({
           </div>
         )}
 
-        {/* Center Panel - Code Editor */}
+        {/* Center Panel - Code Editor / Whiteboard (50%) */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Editor Toolbar */}
+          {/* Center Tabs */}
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/30 shrink-0">
-            <div className="flex items-center gap-2">
-              <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium">Editor</span>
-              <select
-                value={selectedLanguage}
-                onChange={(e) => onLanguageChange(e.target.value)}
-                className="text-[10px] bg-transparent border border-border rounded px-1.5 py-0.5 focus:border-foreground focus:outline-none"
-              >
-                {languages.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {getLanguageLabel(lang)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {!showQuestion && question && (
-                <button
-                  onClick={() => setShowQuestion(true)}
-                  className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-2 py-0.5 rounded border border-border hover:border-foreground"
-                >
-                  Show Question
-                </button>
-              )}
+            <div className="flex items-center gap-1">
               <button
-                onClick={onRunCode}
-                disabled={isRunning}
-                className="inline-flex items-center gap-1 text-[10px] bg-foreground text-background px-2.5 py-0.5 rounded hover:bg-primary transition-colors disabled:opacity-50"
+                onClick={() => setCenterTab("code")}
+                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  centerTab === "code"
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
               >
-                {isRunning ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Play className="h-3 w-3" />
-                )}
-                {isRunning ? "Running..." : "Run"}
+                <Code2 className="h-3.5 w-3.5" />
+                Editor
+              </button>
+              <button
+                onClick={() => setCenterTab("whiteboard")}
+                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  centerTab === "whiteboard"
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <PenTool className="h-3.5 w-3.5" />
+                Whiteboard
               </button>
             </div>
-          </div>
-
-          {/* Code Editor */}
-          <div className="flex-1 bg-muted/20 font-mono text-xs p-3 overflow-auto relative">
-            <textarea
-              value={code}
-              onChange={(e) => onCodeChange(e.target.value)}
-              className="w-full h-full bg-transparent border-none outline-none resize-none font-mono text-xs leading-5 text-foreground/90 pl-5"
-              spellCheck={false}
-              style={{ tabSize: 2 }}
-              placeholder="Write your solution here..."
-            />
-            <div className="absolute left-0 top-0 bottom-0 w-5 text-right text-muted-foreground/20 font-mono text-[10px] pt-3 select-none">
-              {code.split('\n').map((_, i) => (
-                <div key={i} className="leading-5">{i + 1}</div>
-              ))}
-            </div>
-          </div>
-
-          {/* Output Panel */}
-          {output && (
-            <div className="border-t border-border bg-muted/10 shrink-0 max-h-32">
-              <div className="flex items-center justify-between px-3 py-1 border-b border-border">
-                <div className="flex items-center gap-1.5">
-                  <Terminal className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-[10px] font-medium">Output</span>
-                </div>
-                <button
-                  onClick={() => onCodeChange(code)}
-                  className="text-muted-foreground hover:text-foreground"
+            {centerTab === "code" && (
+              <div className="flex items-center gap-2">
+                {!showQuestion && question && (
+                  <button
+                    onClick={() => setShowQuestion(true)}
+                    className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-2 py-0.5 rounded border border-border hover:border-foreground"
+                  >
+                    Show Question
+                  </button>
+                )}
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => onLanguageChange(e.target.value)}
+                  className="text-[10px] bg-transparent border border-border rounded px-1.5 py-0.5 focus:border-foreground focus:outline-none"
                 >
-                  <X className="h-3 w-3" />
+                  {languages.map((lang) => (
+                    <option key={lang} value={lang}>
+                      {getLanguageLabel(lang)}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={onRunCode}
+                  disabled={isRunning}
+                  className="inline-flex items-center gap-1 text-[10px] bg-foreground text-background px-2.5 py-0.5 rounded hover:bg-primary transition-colors disabled:opacity-50"
+                >
+                  {isRunning ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Play className="h-3 w-3" />
+                  )}
+                  {isRunning ? "Running..." : "Run"}
                 </button>
               </div>
-              <div className="p-2 font-mono text-[10px] overflow-auto whitespace-pre-wrap max-h-28">
-                {output}
+            )}
+          </div>
+
+          {/* Center Content */}
+          <div className="flex-1 overflow-hidden">
+            {centerTab === "code" ? (
+              <div className="h-full flex flex-col">
+                {/* Code Editor */}
+                <div className="flex-1 bg-muted/20 overflow-hidden">
+                  <CodeEditor
+                    language={getMonacoLanguage(selectedLanguage)}
+                    value={code}
+                    onChange={onCodeChange}
+                    readOnly={false}
+                  />
+                </div>
+                {/* Output Panel */}
+                {output && (
+                  <div className="border-t border-border bg-muted/10 shrink-0 max-h-32">
+                    <div className="flex items-center justify-between px-3 py-1 border-b border-border">
+                      <div className="flex items-center gap-1.5">
+                        <Terminal className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-[10px] font-medium">Output</span>
+                      </div>
+                      <button
+                        onClick={() => onCodeChange(code)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <div className="p-2 font-mono text-[10px] overflow-auto whitespace-pre-wrap max-h-28">
+                      {output}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="h-full bg-muted/10 relative">
+                <Whiteboard
+                  elements={canvasElements}
+                  onChange={onCanvasChange}
+                  readOnly={!isInterviewer}
+                />
+                {/* Cursor overlay for collaboration */}
+                {Object.entries(cursors).map(([socketId, cursor]) => {
+                  if (socketId === currentSocketId) return null;
+                  return (
+                    <div
+                      key={socketId}
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: cursor.x,
+                        top: cursor.y,
+                        transform: "translate(-50%, -50%)",
+                      }}
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cursor.color }} />
+                      <span className="text-[8px] font-medium ml-1" style={{ color: cursor.color }}>
+                        {cursor.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Right Panel - Whiteboard */}
-        <div className="hidden lg:flex w-64 border-l border-border flex-col shrink-0">
-          <div className="flex items-center justify-between px-2 py-1.5 border-b border-border">
-            <div className="flex items-center gap-1.5">
-              <PenTool className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium">Whiteboard</span>
-              <span className="text-[10px] text-muted-foreground">({canvasElements?.length || 0})</span>
+        {/* Right Panel - Video Calls / Participants (20%) */}
+        <div className="w-64 border-l border-border flex flex-col shrink-0">
+          {/* Video Grid */}
+          <div className="p-2 space-y-2">
+            {/* Local Video */}
+            <div className="relative aspect-video rounded-lg overflow-hidden bg-black/90 border border-border">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-1.5 left-2 flex items-center gap-1.5">
+                <span className="text-[10px] text-white/80 bg-black/50 px-1.5 py-0.5 rounded">
+                  {user?.name || "You"}
+                </span>
+                {isInterviewer && (
+                  <span className="text-[8px] text-primary bg-primary/20 px-1 py-0.5 rounded">Host</span>
+                )}
+              </div>
+              <div className="absolute top-1.5 right-1.5 flex gap-0.5">
+                {!audioEnabled && <MicOff className="h-3 w-3 text-red-400" />}
+                {!videoEnabled && <VideoOff className="h-3 w-3 text-red-400" />}
+              </div>
+              {(!localStream || permissionDenied) && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <div className="text-center">
+                    <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-sm mx-auto">
+                      {user?.name?.charAt(0) || "?"}
+                    </div>
+                    <p className="text-[8px] text-white/40 mt-0.5">
+                      {permissionDenied ? "Camera blocked" : "Camera off"}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Remote Videos */}
+            {peers.map((peer) => (
+              <div key={peer.socketId} className="relative aspect-video rounded-lg overflow-hidden bg-black/90 border border-border">
+                <video
+                  ref={(el) => {
+                    if (el) remoteVideoRefs.current.set(peer.socketId, el);
+                  }}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-1.5 left-2">
+                  <span className="text-[10px] text-white/80 bg-black/50 px-1.5 py-0.5 rounded">
+                    {peer.name}
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            {/* Waiting for others */}
+            {!isSolo && peers.length === 0 && localStream && (
+              <div className="aspect-video rounded-lg overflow-hidden bg-black/50 border border-border flex items-center justify-center">
+                <div className="text-center">
+                  <Users className="h-6 w-6 text-white/40 mx-auto" />
+                  <p className="text-[10px] text-white/40 mt-1">Waiting for others...</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Video Controls */}
+          <div className="border-t border-border p-2 flex items-center justify-center gap-2 shrink-0">
             <button
-              onClick={() => setShowWhiteboard(!showWhiteboard)}
-              className="text-muted-foreground hover:text-foreground"
+              onClick={toggleAudio}
+              className={`p-1.5 rounded-full transition-colors ${
+                audioEnabled ? "text-muted-foreground hover:text-foreground" : "text-red-500 bg-red-500/10"
+              }`}
+              title={audioEnabled ? "Mute" : "Unmute"}
             >
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showWhiteboard ? "rotate-0" : "-rotate-90"}`} />
+              {audioEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={toggleVideo}
+              className={`p-1.5 rounded-full transition-colors ${
+                videoEnabled ? "text-muted-foreground hover:text-foreground" : "text-red-500 bg-red-500/10"
+              }`}
+              title={videoEnabled ? "Turn off camera" : "Turn on camera"}
+            >
+              {videoEnabled ? <VideoIcon className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={onLeave}
+              className="p-1.5 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+              title="Leave room"
+            >
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
-          {showWhiteboard && (
-            <div className="flex-1 bg-muted/10 relative">
-              <Whiteboard
-                elements={canvasElements}
-                onChange={onCanvasChange}
-                readOnly={!isInterviewer}
-              />
-              
-              {/* Cursor overlay for collaboration */}
-              {Object.entries(cursors).map(([socketId, cursor]) => {
-                if (socketId === currentSocketId) return null;
+
+          {/* Participants list */}
+          <div className="border-t border-border p-2 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-[10px] font-medium">In Room</span>
+              <span className="text-[10px] text-muted-foreground ml-auto">{participantCount}</span>
+            </div>
+            <div className="mt-1 space-y-0.5">
+              {roomUsers.map((u) => {
+                const isPeerConnected = peers.some(p => p.socketId === u.socketId);
                 return (
-                  <div
-                    key={socketId}
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: cursor.x,
-                      top: cursor.y,
-                      transform: "translate(-50%, -50%)",
-                    }}
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cursor.color }} />
-                    <span className="text-[8px] font-medium ml-1" style={{ color: cursor.color }}>
-                      {cursor.name}
+                  <div key={u.socketId || u.userId} className="flex items-center gap-1.5">
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${isPeerConnected ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                    <span className="text-[10px] text-muted-foreground truncate flex-1">
+                      {u.name}
+                      {u.userId === room.ownerId && " (Host)"}
+                      {u.userId === user?.id && " (You)"}
                     </span>
                   </div>
                 );
               })}
             </div>
-          )}
-          <div className="border-t border-border p-2 shrink-0">
-            <div className="flex items-center gap-1.5">
-              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[10px] font-medium">Chat</span>
-              <span className="text-[10px] text-muted-foreground ml-auto">0 messages</span>
-            </div>
           </div>
         </div>
       </div>
-
-      {/* Participants Sidebar */}
-      {showParticipants && (
-        <div className="fixed inset-y-0 right-0 w-64 bg-background border-l border-border shadow-lg z-20 p-3 overflow-y-auto">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold">In Room</h3>
-            <button onClick={() => setShowParticipants(false)} className="text-muted-foreground hover:text-foreground">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/30">
-              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
-                {user?.name?.charAt(0) || "?"}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate">{user?.name || "You"}</p>
-                <p className="text-[10px] text-muted-foreground">{isInterviewer ? "Host" : "Participant"}</p>
-              </div>
-              {user?.id === room.ownerId && <span className="text-[10px] text-primary">Host</span>}
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
-            </div>
-
-            {roomUsers.filter(u => u.userId !== user?.id).map((u) => {
-              const isPeerConnected = peers.some(p => p.socketId === u.socketId);
-              return (
-                <div key={u.socketId || u.userId} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/30">
-                  <div className="h-7 w-7 rounded-full bg-blue-500/10 flex items-center justify-center text-xs font-medium">
-                    {u.name?.charAt(0) || "?"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{u.name}</p>
-                    <p className="text-[10px] text-muted-foreground">Participant</p>
-                  </div>
-                  {!isPeerConnected && <span className="text-[9px] text-yellow-500">Connecting...</span>}
-                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${isPeerConnected ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Question Picker Modal */}
       <QuestionPicker
