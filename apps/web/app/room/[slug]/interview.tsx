@@ -152,6 +152,7 @@ export function InterviewView({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false);
+  const [questionError, setQuestionError] = useState<string | null>(null);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -186,6 +187,7 @@ export function InterviewView({
 
   const handleSelectQuestion = async (questionId: string) => {
     setIsUpdatingQuestion(true);
+    setQuestionError(null);
     try {
       const response = await fetch(`/api/rooms/${room.id}/question`, {
         method: "PATCH",
@@ -212,6 +214,7 @@ export function InterviewView({
       }
     } catch (error) {
       console.error("Error selecting question:", error);
+      setQuestionError(error instanceof Error ? error.message : "Failed to select question");
       throw error;
     } finally {
       setIsUpdatingQuestion(false);
@@ -327,9 +330,9 @@ export function InterviewView({
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Question (30%) */}
         {showQuestion && (
-          <div className="w-80 border-r border-border bg-card/30 overflow-y-auto shrink-0">
-            <div className="p-3">
-              <div className="flex items-center justify-between mb-3">
+          <div className="w-[30%] min-w-[280px] max-w-[400px] border-r border-border bg-card/30 overflow-y-auto shrink-0">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   {question ? "Problem" : "No Question Selected"}
                 </h3>
@@ -342,16 +345,16 @@ export function InterviewView({
               </div>
 
               {question ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {/* Title & Difficulty */}
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${getDifficultyBadge(question.difficulty)}`}>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${getDifficultyBadge(question.difficulty)}`}>
                         {question.difficulty}
                       </span>
                       <span className="text-[10px] text-muted-foreground">{question.pattern}</span>
                     </div>
-                    <h4 className="text-sm font-bold">{question.title}</h4>
+                    <h4 className="text-base font-bold">{question.title}</h4>
                   </div>
 
                   {/* Description */}
@@ -362,11 +365,11 @@ export function InterviewView({
                   {/* Examples */}
                   {question.testCases && question.testCases.length > 0 && (
                     <div>
-                      <h5 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                      <h5 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                         Examples
                       </h5>
                       {question.testCases.filter(tc => !tc.isHidden).slice(0, 2).map((tc, idx) => (
-                        <div key={tc.id} className="text-[10px] font-mono bg-muted/20 p-2 rounded border border-border mb-1.5">
+                        <div key={tc.id} className="text-[10px] font-mono bg-muted/20 p-2 rounded border border-border mb-2">
                           <div className="text-muted-foreground">Input: {JSON.stringify(tc.input)}</div>
                           <div className="text-primary">Output: {JSON.stringify(tc.expected)}</div>
                         </div>
@@ -376,7 +379,7 @@ export function InterviewView({
 
                   {/* Constraints */}
                   <div>
-                    <h5 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                    <h5 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                       Constraints
                     </h5>
                     <ul className="list-disc list-inside space-y-0.5 text-[10px] text-muted-foreground">
@@ -388,7 +391,7 @@ export function InterviewView({
 
                   {/* Interviewer Notes */}
                   {isInterviewer && (
-                    <div className="border border-yellow-500/20 bg-yellow-500/5 rounded p-2">
+                    <div className="border border-yellow-500/20 bg-yellow-500/5 rounded p-3">
                       <h5 className="text-[10px] font-semibold text-yellow-500 uppercase tracking-wider">Notes</h5>
                       <p className="text-[10px] text-muted-foreground">Only you can see these</p>
                     </div>
@@ -399,19 +402,27 @@ export function InterviewView({
                     <button
                       onClick={() => setShowQuestionPicker(true)}
                       disabled={isUpdatingQuestion}
-                      className="w-full text-[10px] text-primary hover:underline py-1 border-t border-border mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full text-[10px] text-primary hover:underline py-2 border-t border-border mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isUpdatingQuestion ? "Updating..." : "Change Question →"}
                     </button>
                   )}
+
+                  {/* Error message */}
+                  {questionError && (
+                    <div className="text-[10px] text-red-500 bg-red-500/10 p-2 rounded border border-red-500/20">
+                      {questionError}
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-12 text-muted-foreground">
+                  <div className="text-4xl mb-3">📋</div>
                   <p className="text-sm">No question selected</p>
                   {isInterviewer && (
                     <button
                       onClick={() => setShowQuestionPicker(true)}
-                      className="text-xs text-primary hover:underline mt-2"
+                      className="text-xs text-primary hover:underline mt-3 inline-flex items-center gap-1"
                     >
                       Pick a question →
                     </button>
@@ -554,7 +565,7 @@ export function InterviewView({
         </div>
 
         {/* Right Panel - Video Calls / Participants (20%) */}
-        <div className="w-64 border-l border-border flex flex-col shrink-0">
+        <div className="w-[20%] min-w-[180px] max-w-[280px] border-l border-border flex flex-col shrink-0">
           {/* Video Grid */}
           <div className="p-2 space-y-2">
             {/* Local Video */}

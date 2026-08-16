@@ -273,13 +273,31 @@ function RoomClient({ slug }: { slug: string }) {
     };
   }, [router, slug]);
 
+  // Handle question update from the InterviewView
+  const handleQuestionUpdate = useCallback((updatedQuestion: any) => {
+    console.log("🔄 Updating question in room:", updatedQuestion);
+    setRoom((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        question: updatedQuestion,
+        questionId: updatedQuestion.id,
+      };
+    });
+    
+    // Update the code with new starter code
+    if (updatedQuestion?.starterCode) {
+      const starter = updatedQuestion.starterCode[selectedLanguage] || "";
+      setCode(starter);
+    }
+  }, [selectedLanguage]);
+
   const handleStartInterview = useCallback(() => {
     setViewMode("interview");
   }, []);
 
   const handleLeave = useCallback(() => {
     if (confirm("Are you sure you want to leave this room?")) {
-      // Cleanup before leaving
       cleanup();
       cleanupWebRTC();
       router.push("/dashboard");
@@ -446,6 +464,7 @@ function RoomClient({ slug }: { slug: string }) {
       }}
       onRunCode={handleRunCode}
       onCanvasChange={handleCanvasChange}
+      onQuestionUpdate={handleQuestionUpdate}
       onBackToLobby={() => setViewMode("lobby")}
       onLeave={handleLeave}
       localStream={localStream}
