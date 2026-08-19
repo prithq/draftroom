@@ -91,6 +91,8 @@ interface InterviewProps {
   canvasElements: any[];
   cursors: Record<string, { x: number; y: number; name: string; color: string }>;
   currentSocketId: string;
+  isConnected: boolean;
+  emit: (event: string, data: any) => void;
   onCodeChange: (code: string) => void;
   onLanguageChange: (language: string) => void;
   onRunCode: () => void;
@@ -103,7 +105,6 @@ interface InterviewProps {
   roomUsers: RoomUser[];
   audioEnabled: boolean;
   videoEnabled: boolean;
-  isConnected: boolean;
   toggleAudio: () => void;
   toggleVideo: () => void;
   participantCount: number;
@@ -126,6 +127,8 @@ export function InterviewView({
   canvasElements,
   cursors,
   currentSocketId,
+  isConnected,
+  emit,
   onCodeChange,
   onLanguageChange,
   onRunCode,
@@ -138,7 +141,6 @@ export function InterviewView({
   roomUsers,
   audioEnabled,
   videoEnabled,
-  isConnected,
   toggleAudio,
   toggleVideo,
   participantCount,
@@ -189,6 +191,7 @@ export function InterviewView({
     setIsUpdatingQuestion(true);
     setQuestionError(null);
     try {
+      // 1. Update the database
       const response = await fetch(`/api/rooms/${room.id}/question`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -202,12 +205,20 @@ export function InterviewView({
 
       const data = await response.json();
       
-      // Update the question in the parent component
+      // 2. Update local state
       if (onQuestionUpdate && data.question) {
         onQuestionUpdate(data.question);
       }
       
-      // Update the code editor with new starter code
+      // 3. 🔥 BROADCAST TO OTHER USERS via Socket.io
+      if (isConnected && emit) {
+        emit("question-change", {
+          roomId: room.id,
+          question: data.question
+        });
+      }
+      
+      // 4. Update the code editor with new starter code
       if (data.question?.starterCode) {
         const starter = data.question.starterCode[selectedLanguage] || "";
         onCodeChange(starter);

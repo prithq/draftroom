@@ -26,12 +26,16 @@ interface UseRoomReturn {
   code: string;
   canvasElements: any[];
   cursors: Record<string, { x: number; y: number; name: string; color: string }>;
+  question: any | null; 
+  language: string | null; 
   isConnected: boolean;
   error: string | null;
   currentSocketId: string;
   handleCodeChange: (code: string) => void;
   handleCanvasChange: (elements: any[]) => void;
   handleCursorMove: (x: number, y: number) => void;
+  handleQuestionChange: (question: any) => void; 
+  handleLanguageChange: (language: string) => void; 
   on: (event: string, handler: (data: any) => void) => () => void;
   emit: (event: string, data: any) => void;
   cleanup: () => void;
@@ -48,6 +52,8 @@ export function useRoom({
   const [users, setUsers] = useState<RoomUser[]>([]);
   const [code, setCode] = useState<string>("");
   const [canvasElements, setCanvasElements] = useState<any[]>([]);
+  const [question, setQuestion] = useState<any | null>(null); 
+  const [language, setLanguage] = useState<string | null>(null); 
   const [cursors, setCursors] = useState<Record<string, { x: number; y: number; name: string; color: string }>>({});
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +68,6 @@ export function useRoom({
   useEffect(() => {
     isMounted.current = true;
 
-    // Connect to Socket.io server
     const socketInstance = io(serverUrl, {
       transports: ["websocket"],
       reconnection: true,
@@ -75,7 +80,6 @@ export function useRoom({
     socketRef.current = socketInstance;
     setSocket(socketInstance);
 
-    // Socket event handlers
     socketInstance.on("connect", () => {
       console.log("🟢 Connected to socket server");
       setIsConnected(true);
@@ -83,7 +87,6 @@ export function useRoom({
       setError(null);
       reconnectAttempts.current = 0;
 
-      // Join the room
       socketInstance.emit("join-room", {
         roomId,
         userId,
@@ -149,14 +152,40 @@ export function useRoom({
       }
     });
 
-    // 🔧 FIX: Code change from server - the server sends just the code string
-    socketInstance.on("code-change", (newCode: string) => {
-      setCode(newCode);
+
+    socketInstance.on("question-init", ({ question: initialQuestion }: { question: any }) => {
+      if (initialQuestion) {
+        setQuestion(initialQuestion);
+      }
     });
 
-    // 🔧 FIX: Canvas change from server - the server sends just the elements array
-    socketInstance.on("canvas-change", (elements: any[]) => {
-      setCanvasElements(elements);
+    // Listen for code changes from other users
+    socketInstance.on("code-change", ({ code: newCode, fromSocketId }: { code: string; fromSocketId: string }) => {
+      if (fromSocketId !== socketInstance.id) {
+        setCode(newCode);
+      }
+    });
+
+    // Listen for canvas changes from other users
+    socketInstance.on("canvas-change", ({ elements, fromSocketId }: { elements: any[]; fromSocketId: string }) => {
+      if (fromSocketId !== socketInstance.id) {
+        setCanvasElements(elements);
+      }
+    });
+
+    //  Listen for question updates from other users
+    socketInstance.on("question-update", ({ question: updatedQuestion, fromSocketId }: { question: any; fromSocketId: string }) => {
+      if (fromSocketId !== socketInstance.id) {
+        console.log("📥 Question updated by another user:", updatedQuestion?.title);
+        setQuestion(updatedQuestion);
+      }
+    });
+
+    // Listen for language updates from other users
+    socketInstance.on("language-update", ({ language: newLanguage, fromSocketId }: { language: string; fromSocketId: string }) => {
+      if (fromSocketId !== socketInstance.id) {
+        setLanguage(newLanguage);
+      }
     });
 
     // Listen for cursor updates
@@ -177,7 +206,6 @@ export function useRoom({
       });
     });
 
-    // Cleanup on unmount
     return () => {
       isMounted.current = false;
       
@@ -216,6 +244,27 @@ export function useRoom({
     socketRef.current.emit("canvas-change", {
       roomId,
       elements,
+    });
+  }, [roomId, isConnected]);
+
+  //Emit question changes
+  const handleQuestionChange = useCallback((newQuestion: any) => {
+    if (!socketRef.current || !isConnected) return;
+    
+    setQuestion(newQuestion);
+    socketRef.current.emit("question-change", {
+      roomId,
+      question: newQuestion,
+    });
+  }, [roomId, isConnected]);
+
+  const handleLanguageChange = useCallback((newLanguage: string) => {
+    if (!socketRef.current || !isConnected) return;
+    
+    setLanguage(newLanguage);
+    socketRef.current.emit("language-change", {
+      roomId,
+      language: newLanguage,
     });
   }, [roomId, isConnected]);
 
@@ -263,7 +312,7 @@ export function useRoom({
     socketRef.current.emit(event, data);
   }, [isConnected]);
 
-  // Cleanup all connections
+  // Cleanup
   const cleanup = useCallback(() => {
     if (socketRef.current && isConnected) {
       socketRef.current.emit("leave-room", { roomId });
@@ -279,6 +328,7 @@ export function useRoom({
     setUsers([]);
     setCursors({});
     setError(null);
+    setQuestion(null);
   }, [roomId, isConnected]);
 
   return {
@@ -287,12 +337,16 @@ export function useRoom({
     code,
     canvasElements,
     cursors,
+    question, 
+    language, 
     isConnected,
     error,
     currentSocketId,
     handleCodeChange,
     handleCanvasChange,
     handleCursorMove,
+    handleQuestionChange, 
+    handleLanguageChange, 
     on,
     emit,
     cleanup,

@@ -79,12 +79,14 @@ function RoomClient({ slug }: { slug: string }) {
     code: syncedCode,
     canvasElements,
     cursors,
+    question: syncedQuestion,
     isConnected,
     error: socketError,
     currentSocketId: socketId,
     handleCodeChange,
     handleCanvasChange,
     handleCursorMove,
+    handleQuestionChange,
     on,
     emit,
     cleanup,
@@ -135,6 +137,9 @@ function RoomClient({ slug }: { slug: string }) {
       setSelectedLanguage(room.language);
     }
   }, [room]);
+
+  // Use synced question if available, otherwise use room.question
+  const displayQuestion = syncedQuestion || room?.question;
 
   // Fetch room data and auto-join
   useEffect(() => {
@@ -285,12 +290,17 @@ function RoomClient({ slug }: { slug: string }) {
       };
     });
     
+    // Also update the synced question via Socket.io
+    if (isConnected && handleQuestionChange) {
+      handleQuestionChange(updatedQuestion);
+    }
+    
     // Update the code with new starter code
     if (updatedQuestion?.starterCode) {
       const starter = updatedQuestion.starterCode[selectedLanguage] || "";
       setCode(starter);
     }
-  }, [selectedLanguage]);
+  }, [selectedLanguage, isConnected, handleQuestionChange]);
 
   const handleStartInterview = useCallback(() => {
     setViewMode("interview");
@@ -443,7 +453,7 @@ function RoomClient({ slug }: { slug: string }) {
       room={room}
       user={user}
       isInterviewer={user?.id === room.ownerId}
-      question={room.question}
+      question={displayQuestion}
       code={code}
       selectedLanguage={selectedLanguage}
       languages={languages}
@@ -452,6 +462,8 @@ function RoomClient({ slug }: { slug: string }) {
       canvasElements={canvasElements}
       cursors={cursors}
       currentSocketId={socketId || ""}
+      isConnected={isConnected}
+      emit={emit}
       onCodeChange={(newCode) => {
         setCode(newCode);
         handleCodeChange(newCode);
@@ -472,7 +484,6 @@ function RoomClient({ slug }: { slug: string }) {
       roomUsers={roomUsers}
       audioEnabled={audioEnabled}
       videoEnabled={videoEnabled}
-      isConnected={isConnected}
       toggleAudio={toggleAudio}
       toggleVideo={toggleVideo}
       participantCount={room.participant?.length || 0}
