@@ -4,8 +4,21 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 
+
+const CLOUDFLARE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  CLOUDFLARE_URL,
+  process.env.BETTER_AUTH_URL || "",
+  process.env.NEXT_PUBLIC_APP_URL || "",
+];
+
+
 const app = express();
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+app.use(cors({ origin: ["http://localhost:3000","https://faqs-fraction-pockets-double.trycloudflare.com"], credentials: true }));
 app.use(express.json());
 
 app.get("/health", (req, res) => {
@@ -16,7 +29,7 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: allowedOrigins,
     credentials: true,
   },
 });

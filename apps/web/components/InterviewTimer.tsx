@@ -1,7 +1,7 @@
 // apps/web/components/InterviewTimer.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Clock } from "lucide-react";
 
 interface InterviewTimerProps {
@@ -18,7 +18,13 @@ export function InterviewTimer({ isActive, onTimeUpdate }: InterviewTimerProps) 
     const interval = setInterval(() => {
       setSeconds((prev) => {
         const newTime = prev + 1;
-        onTimeUpdate?.(newTime);
+        // ✅ Use callback to avoid state update during render
+        if (onTimeUpdate) {
+          // ✅ Use requestAnimationFrame to defer the update
+          requestAnimationFrame(() => {
+            onTimeUpdate(newTime);
+          });
+        }
         return newTime;
       });
     }, 1000);

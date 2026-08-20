@@ -29,6 +29,13 @@ import {
 import { Whiteboard } from "@/components/Whiteboard";
 import { QuestionPicker } from "@/components/QuestionPicker";
 import { CodeEditor } from "@/components/CodeEditor";
+import { RoomStatus } from "@/components/RoomStatus";
+import { QuickFeedback } from "@/components/QuickFeedback";
+import { ReconnectionStatus } from "@/components/ReconnectionStatus";
+import { SessionSummary } from "@/components/SessionSummary";
+import { InterviewTimer } from "@/components/InterviewTimer";
+import { EndInterviewModal } from "@/components/EndInterviewModal";
+import { ParticipantNotification } from "@/components/ParticipantNotification";
 
 interface User {
   id: string;
@@ -70,6 +77,13 @@ interface Question {
   }[];
 }
 
+interface Notification {
+  id: string;
+  type: "join" | "leave";
+  name: string;
+  timestamp: Date;
+}
+
 interface InterviewProps {
   room: {
     id: string;
@@ -92,6 +106,9 @@ interface InterviewProps {
   cursors: Record<string, { x: number; y: number; name: string; color: string }>;
   currentSocketId: string;
   isConnected: boolean;
+  isReconnecting: boolean;
+  reconnectAttempts: number;
+  maxReconnectAttempts: number;
   emit: (event: string, data: any) => void;
   onCodeChange: (code: string) => void;
   onLanguageChange: (language: string) => void;
@@ -110,6 +127,7 @@ interface InterviewProps {
   participantCount: number;
   copyInviteLink: () => void;
   copied: boolean;
+  onEndInterview: (options: { saveNotes: boolean; sendFeedback: boolean }) => Promise<void>;
 }
 
 type CenterTab = "code" | "whiteboard";
@@ -128,6 +146,9 @@ export function InterviewView({
   cursors,
   currentSocketId,
   isConnected,
+  isReconnecting,
+  reconnectAttempts,
+  maxReconnectAttempts,
   emit,
   onCodeChange,
   onLanguageChange,
@@ -146,6 +167,7 @@ export function InterviewView({
   participantCount,
   copyInviteLink,
   copied,
+  onEndInterview,
 }: InterviewProps) {
   const [showQuestion, setShowQuestion] = useState(true);
   const [centerTab, setCenterTab] = useState<CenterTab>("code");
@@ -155,6 +177,16 @@ export function InterviewView({
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false);
   const [questionError, setQuestionError] = useState<string | null>(null);
+  
+  // New states for added features
+  const [showEndModal, setShowEndModal] = useState(false);
+  const [showSessionSummary, setShowSessionSummary] = useState(false);
+  const [sessionData, setSessionData] = useState<any>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [interviewDuration, setInterviewDuration] = useState(0);
+  const [questionCount, setQuestionCount] = useState(0);
+  const [codeChanges, setCodeChanges] = useState(0);
+  const [feedbackNotes, setFeedbackNotes] = useState<string[]>([]);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -187,11 +219,72 @@ export function InterviewView({
     }
   }, [localStream, videoEnabled]);
 
+  // Track question count
+  useEffect(() => {
+    if (question) {
+      setQuestionCount((prev) => prev + 1);
+    }
+  }, [question?.id]);
+
+  // Track code changes
+  useEffect(() => {
+    if (code) {
+      setCodeChanges((prev) => prev + 1);
+    }
+  }, [code]);
+
+  // Listen for participant join/leave events
+  useEffect(() => {
+    const handleUserJoined = (user: RoomUser) => {
+      if (user.userId !== user?.id) {
+        setNotifications((prev) => [
+          ...prev,
+          {
+            id: `join-${Date.now()}`,
+            type: "join",
+            name: user.name,
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    };
+
+    const [interviewDuration, setInterviewDuration] = useState(0);
+
+// Add this effect
+useEffect(() => {
+  if (!room.isActive) return;
+
+  const interval = setInterval(() => {
+    setInterviewDuration((prev) => prev + 1);
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, [room.isActive]);
+
+    const handleUserLeft = (socketId: string) => {
+      const user = roomUsers.find((u) => u.socketId === socketId);
+      if (user && user.userId !== user?.id) {
+        setNotifications((prev) => [
+          ...prev,
+          {
+            id: `leave-${Date.now()}`,
+            type: "leave",
+            name: user.name,
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    };
+
+    // These would come from socket events
+    // For now, we'll simulate with roomUsers changes
+  }, [roomUsers, user]);
+
   const handleSelectQuestion = async (questionId: string) => {
     setIsUpdatingQuestion(true);
     setQuestionError(null);
     try {
-      // 1. Update the database
       const response = await fetch(`/api/rooms/${room.id}/question`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -205,20 +298,17 @@ export function InterviewView({
 
       const data = await response.json();
       
-      // 2. Update local state
       if (onQuestionUpdate && data.question) {
         onQuestionUpdate(data.question);
       }
       
-      // 3. 🔥 BROADCAST TO OTHER USERS via Socket.io
       if (isConnected && emit) {
         emit("question-change", {
           roomId: room.id,
-          question: data.question
+          question: data.question,
         });
       }
       
-      // 4. Update the code editor with new starter code
       if (data.question?.starterCode) {
         const starter = data.question.starterCode[selectedLanguage] || "";
         onCodeChange(starter);
@@ -230,6 +320,38 @@ export function InterviewView({
     } finally {
       setIsUpdatingQuestion(false);
     }
+  };
+
+  const handleEndInterview = async (options: { saveNotes: boolean; sendFeedback: boolean }) => {
+    try {
+      // Prepare session data
+      const data = {
+        duration: interviewDuration,
+        questionCount,
+        codeChanges,
+        participants: [
+          { name: user?.name || "You", role: isInterviewer ? "Interviewer" : "Candidate" },
+          ...roomUsers
+            .filter((u) => u.userId !== user?.id)
+            .map((u) => ({ name: u.name, role: "Participant" })),
+        ],
+        notes: feedbackNotes.join("\n"),
+        feedback: options.sendFeedback ? "Feedback sent to candidate" : "No feedback sent",
+      };
+      
+      setSessionData(data);
+      setShowEndModal(false);
+      setShowSessionSummary(true);
+      
+      // Call the parent handler
+      await onEndInterview(options);
+    } catch (error) {
+      console.error("Error ending interview:", error);
+    }
+  };
+
+  const handleDismissNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
   const getDifficultyBadge = (difficulty: string) => {
@@ -266,7 +388,6 @@ export function InterviewView({
 
   const isSolo = room.roomType === "SOLO";
 
-  // Get language for Monaco
   const getMonacoLanguage = (lang: string) => {
     const map: Record<string, string> = {
       javascript: "javascript",
@@ -282,6 +403,14 @@ export function InterviewView({
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* Reconnection Status */}
+      <ReconnectionStatus
+        isConnected={isConnected}
+        isReconnecting={isReconnecting}
+        reconnectAttempts={reconnectAttempts}
+        maxAttempts={maxReconnectAttempts}
+      />
+
       {/* Top Bar */}
       <nav className="border-b border-border px-4 py-2 bg-background/50 backdrop-blur-sm shrink-0 flex items-center justify-between z-10">
         <div className="flex items-center gap-3 min-w-0">
@@ -298,12 +427,20 @@ export function InterviewView({
             <ArrowLeft className="h-3 w-3" />
             Back
           </button>
-          {room.isActive && (
-            <span className="inline-flex items-center gap-1.5 text-[10px] text-green-500 font-medium shrink-0">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-              Live
-            </span>
-          )}
+          
+          {/* Room Status */}
+          <RoomStatus
+            isActive={room.isActive}
+            isConnected={isConnected}
+            participantCount={participantCount}
+            className="hidden sm:flex"
+          />
+          
+          {/* Timer */}
+          <InterviewTimer
+            isActive={room.isActive}
+            onTimeUpdate={(time) => setInterviewDuration(time)}
+          />
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -331,8 +468,13 @@ export function InterviewView({
           {user?.image && (
             <img src={user.image} alt={user.name || "User"} className="h-6 w-6 rounded-full" />
           )}
-          <button onClick={onLeave} className="text-muted-foreground hover:text-foreground transition-colors p-1">
-            <LogOut className="h-4 w-4" />
+          
+          {/* End Interview Button */}
+          <button
+            onClick={() => setShowEndModal(true)}
+            className="text-xs text-red-500 hover:text-red-600 transition-colors px-2 py-1 rounded border border-red-500/20 hover:border-red-500/40"
+          >
+            {isInterviewer ? "End" : "Leave"}
           </button>
         </div>
       </nav>
@@ -357,7 +499,6 @@ export function InterviewView({
 
               {question ? (
                 <div className="space-y-4">
-                  {/* Title & Difficulty */}
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${getDifficultyBadge(question.difficulty)}`}>
@@ -368,12 +509,10 @@ export function InterviewView({
                     <h4 className="text-base font-bold">{question.title}</h4>
                   </div>
 
-                  {/* Description */}
                   <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
                     {question.description}
                   </div>
 
-                  {/* Examples */}
                   {question.testCases && question.testCases.length > 0 && (
                     <div>
                       <h5 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -388,7 +527,6 @@ export function InterviewView({
                     </div>
                   )}
 
-                  {/* Constraints */}
                   <div>
                     <h5 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                       Constraints
@@ -400,7 +538,6 @@ export function InterviewView({
                     </ul>
                   </div>
 
-                  {/* Interviewer Notes */}
                   {isInterviewer && (
                     <div className="border border-yellow-500/20 bg-yellow-500/5 rounded p-3">
                       <h5 className="text-[10px] font-semibold text-yellow-500 uppercase tracking-wider">Notes</h5>
@@ -408,7 +545,6 @@ export function InterviewView({
                     </div>
                   )}
 
-                  {/* Change Question (Interviewer only) */}
                   {isInterviewer && (
                     <button
                       onClick={() => setShowQuestionPicker(true)}
@@ -419,7 +555,6 @@ export function InterviewView({
                     </button>
                   )}
 
-                  {/* Error message */}
                   {questionError && (
                     <div className="text-[10px] text-red-500 bg-red-500/10 p-2 rounded border border-red-500/20">
                       {questionError}
@@ -446,7 +581,6 @@ export function InterviewView({
 
         {/* Center Panel - Code Editor / Whiteboard (50%) */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Center Tabs */}
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/30 shrink-0">
             <div className="flex items-center gap-1">
               <button
@@ -505,15 +639,24 @@ export function InterviewView({
                   )}
                   {isRunning ? "Running..." : "Run"}
                 </button>
+
+                {/* Quick Feedback (Interviewer only) */}
+                {isInterviewer && (
+                  <QuickFeedback
+                    onFeedback={(type, note) => {
+                      const feedbackText = `${type}: ${note || ""}`;
+                      setFeedbackNotes((prev) => [...prev, feedbackText]);
+                      console.log("Feedback:", type, note);
+                    }}
+                  />
+                )}
               </div>
             )}
           </div>
 
-          {/* Center Content */}
           <div className="flex-1 overflow-hidden">
             {centerTab === "code" ? (
               <div className="h-full flex flex-col">
-                {/* Code Editor */}
                 <div className="flex-1 bg-muted/20 overflow-hidden">
                   <CodeEditor
                     language={getMonacoLanguage(selectedLanguage)}
@@ -522,7 +665,6 @@ export function InterviewView({
                     readOnly={false}
                   />
                 </div>
-                {/* Output Panel */}
                 {output && (
                   <div className="border-t border-border bg-muted/10 shrink-0 max-h-32">
                     <div className="flex items-center justify-between px-3 py-1 border-b border-border">
@@ -550,7 +692,6 @@ export function InterviewView({
                   onChange={onCanvasChange}
                   readOnly={!isInterviewer}
                 />
-                {/* Cursor overlay for collaboration */}
                 {Object.entries(cursors).map(([socketId, cursor]) => {
                   if (socketId === currentSocketId) return null;
                   return (
@@ -577,9 +718,7 @@ export function InterviewView({
 
         {/* Right Panel - Video Calls / Participants (20%) */}
         <div className="w-[20%] min-w-[180px] max-w-[280px] border-l border-border flex flex-col shrink-0">
-          {/* Video Grid */}
           <div className="p-2 space-y-2">
-            {/* Local Video */}
             <div className="relative aspect-video rounded-lg overflow-hidden bg-black/90 border border-border">
               <video
                 ref={localVideoRef}
@@ -614,7 +753,6 @@ export function InterviewView({
               )}
             </div>
 
-            {/* Remote Videos */}
             {peers.map((peer) => (
               <div key={peer.socketId} className="relative aspect-video rounded-lg overflow-hidden bg-black/90 border border-border">
                 <video
@@ -633,7 +771,6 @@ export function InterviewView({
               </div>
             ))}
 
-            {/* Waiting for others */}
             {!isSolo && peers.length === 0 && localStream && (
               <div className="aspect-video rounded-lg overflow-hidden bg-black/50 border border-border flex items-center justify-center">
                 <div className="text-center">
@@ -644,7 +781,6 @@ export function InterviewView({
             )}
           </div>
 
-          {/* Video Controls */}
           <div className="border-t border-border p-2 flex items-center justify-center gap-2 shrink-0">
             <button
               onClick={toggleAudio}
@@ -673,7 +809,6 @@ export function InterviewView({
             </button>
           </div>
 
-          {/* Participants list */}
           <div className="border-t border-border p-2 shrink-0">
             <div className="flex items-center gap-1.5">
               <Users className="h-3.5 w-3.5 text-muted-foreground" />
@@ -699,6 +834,12 @@ export function InterviewView({
         </div>
       </div>
 
+      {/* Participant Notifications */}
+      <ParticipantNotification
+        notifications={notifications}
+        onDismiss={handleDismissNotification}
+      />
+
       {/* Question Picker Modal */}
       <QuestionPicker
         isOpen={showQuestionPicker}
@@ -706,6 +847,32 @@ export function InterviewView({
         onSelect={handleSelectQuestion}
         currentQuestionId={question?.id}
         roomId={room.id}
+      />
+
+      {/* End Interview Modal */}
+      <EndInterviewModal
+        isOpen={showEndModal}
+        onClose={() => setShowEndModal(false)}
+        onConfirm={handleEndInterview}
+        duration={interviewDuration}
+        questionCount={questionCount}
+        isInterviewer={isInterviewer}
+      />
+
+      {/* Session Summary Modal */}
+      <SessionSummary
+        isOpen={showSessionSummary}
+        onClose={() => setShowSessionSummary(false)}
+        data={sessionData || {
+          duration: interviewDuration,
+          questionCount,
+          codeChanges,
+          participants: [
+            { name: user?.name || "You", role: isInterviewer ? "Interviewer" : "Candidate" },
+          ],
+          notes: feedbackNotes.join("\n"),
+          feedback: "No feedback recorded",
+        }}
       />
     </div>
   );
