@@ -1,7 +1,7 @@
 // apps/web/app/room/[slug]/interview.tsx
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Mic,
@@ -24,6 +24,7 @@ import {
   Terminal,
   BookOpen,
   Loader2,
+  Clock,
 } from "lucide-react";
 
 import { Whiteboard } from "@/components/Whiteboard";
@@ -169,6 +170,7 @@ export function InterviewView({
   copied,
   onEndInterview,
 }: InterviewProps) {
+  // All hooks must be at the top level, before any conditionals
   const [showQuestion, setShowQuestion] = useState(true);
   const [centerTab, setCenterTab] = useState<CenterTab>("code");
   const [showParticipants, setShowParticipants] = useState(false);
@@ -177,8 +179,6 @@ export function InterviewView({
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [isUpdatingQuestion, setIsUpdatingQuestion] = useState(false);
   const [questionError, setQuestionError] = useState<string | null>(null);
-  
-  // New states for added features
   const [showEndModal, setShowEndModal] = useState(false);
   const [showSessionSummary, setShowSessionSummary] = useState(false);
   const [sessionData, setSessionData] = useState<any>(null);
@@ -191,7 +191,7 @@ export function InterviewView({
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
-  // Handle video streams
+  // All useEffects at the top level
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
@@ -207,7 +207,6 @@ export function InterviewView({
     });
   }, [peers]);
 
-  // Check for permission denied
   useEffect(() => {
     if (!localStream && videoEnabled) {
       const timer = setTimeout(() => {
@@ -218,6 +217,17 @@ export function InterviewView({
       setPermissionDenied(false);
     }
   }, [localStream, videoEnabled]);
+
+  // Timer effect - moved to top level
+  useEffect(() => {
+    if (!room.isActive) return;
+
+    const interval = setInterval(() => {
+      setInterviewDuration((prev) => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [room.isActive]);
 
   // Track question count
   useEffect(() => {
@@ -233,55 +243,8 @@ export function InterviewView({
     }
   }, [code]);
 
-  // Listen for participant join/leave events
-  useEffect(() => {
-    const handleUserJoined = (user: RoomUser) => {
-      if (user.userId !== user?.id) {
-        setNotifications((prev) => [
-          ...prev,
-          {
-            id: `join-${Date.now()}`,
-            type: "join",
-            name: user.name,
-            timestamp: new Date(),
-          },
-        ]);
-      }
-    };
-
-    const [interviewDuration, setInterviewDuration] = useState(0);
-
-// Add this effect
-useEffect(() => {
-  if (!room.isActive) return;
-
-  const interval = setInterval(() => {
-    setInterviewDuration((prev) => prev + 1);
-  }, 1000);
-
-  return () => clearInterval(interval);
-}, [room.isActive]);
-
-    const handleUserLeft = (socketId: string) => {
-      const user = roomUsers.find((u) => u.socketId === socketId);
-      if (user && user.userId !== user?.id) {
-        setNotifications((prev) => [
-          ...prev,
-          {
-            id: `leave-${Date.now()}`,
-            type: "leave",
-            name: user.name,
-            timestamp: new Date(),
-          },
-        ]);
-      }
-    };
-
-    // These would come from socket events
-    // For now, we'll simulate with roomUsers changes
-  }, [roomUsers, user]);
-
-  const handleSelectQuestion = async (questionId: string) => {
+  // All callback functions
+  const handleSelectQuestion = useCallback(async (questionId: string) => {
     setIsUpdatingQuestion(true);
     setQuestionError(null);
     try {
@@ -320,11 +283,10 @@ useEffect(() => {
     } finally {
       setIsUpdatingQuestion(false);
     }
-  };
+  }, [room.id, selectedLanguage, onQuestionUpdate, isConnected, emit, onCodeChange]);
 
-  const handleEndInterview = async (options: { saveNotes: boolean; sendFeedback: boolean }) => {
+  const handleEndInterview = useCallback(async (options: { saveNotes: boolean; sendFeedback: boolean }) => {
     try {
-      // Prepare session data
       const data = {
         duration: interviewDuration,
         questionCount,
@@ -343,17 +305,27 @@ useEffect(() => {
       setShowEndModal(false);
       setShowSessionSummary(true);
       
-      // Call the parent handler
       await onEndInterview(options);
     } catch (error) {
       console.error("Error ending interview:", error);
     }
-  };
+  }, [interviewDuration, questionCount, codeChanges, user, roomUsers, isInterviewer, feedbackNotes, onEndInterview]);
 
-  const handleDismissNotification = (id: string) => {
+  const handleDismissNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
+  }, []);
 
+  const handleFullscreenToggle = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, []);
+
+  // Helper functions
   const getDifficultyBadge = (difficulty: string) => {
     switch (difficulty) {
       case "EASY": return "bg-green-500/10 text-green-500 border-green-500/20";
@@ -376,18 +348,6 @@ useEffect(() => {
     return labels[lang] || lang;
   };
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
-
-  const isSolo = room.roomType === "SOLO";
-
   const getMonacoLanguage = (lang: string) => {
     const map: Record<string, string> = {
       javascript: "javascript",
@@ -401,6 +361,20 @@ useEffect(() => {
     return map[lang] || "javascript";
   };
 
+  const formatTime = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+
+    if (hours > 0) {
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    }
+    return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
+  const isSolo = room.roomType === "SOLO";
+
+  // No more conditionals before hooks
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Reconnection Status */}
@@ -437,10 +411,10 @@ useEffect(() => {
           />
           
           {/* Timer */}
-          <InterviewTimer
-            isActive={room.isActive}
-            onTimeUpdate={(time) => setInterviewDuration(time)}
-          />
+          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            <span className="font-mono">{formatTime(interviewDuration)}</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -460,7 +434,7 @@ useEffect(() => {
             <Users className="h-4 w-4" />
           </button>
           <button
-            onClick={toggleFullscreen}
+            onClick={handleFullscreenToggle}
             className="text-muted-foreground hover:text-foreground transition-colors p-1"
           >
             {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -640,13 +614,11 @@ useEffect(() => {
                   {isRunning ? "Running..." : "Run"}
                 </button>
 
-                {/* Quick Feedback (Interviewer only) */}
                 {isInterviewer && (
                   <QuickFeedback
                     onFeedback={(type, note) => {
                       const feedbackText = `${type}: ${note || ""}`;
                       setFeedbackNotes((prev) => [...prev, feedbackText]);
-                      console.log("Feedback:", type, note);
                     }}
                   />
                 )}
